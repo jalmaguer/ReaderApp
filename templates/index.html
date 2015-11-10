@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+    <body>
+        <h1>Stats</h1>
+            <a href="{{ url_for('show_stats') }}">stats</a>
+        <h1>Words</h1>
+            <a href="{{ url_for('show_words') }}">words</a>
+        <h1>Texts</h1>
+        <ul>
+        {% for text in texts %}
+            <li><h2><a href="{{ url_for('show_text', text_id=text.text_id) }}">{{ text.title }}</a></h2>
+        {% else %}
+            <li><em>No entries so far</em>
+        {% endfor %}
+        </ul>
+        <h1>Paste in a Text</h1>
+        <form action="{{ url_for('upload_text') }}" method=post>
+            <p>Text Name</p>
+            <input type=text name=title><br>
+            <p>Text</p>
+            <textarea name=text rows=15 cols=100></textarea><br>
+            <input type="submit">
+        </form>
+    </body>
+</html>

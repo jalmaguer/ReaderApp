@@ -1,0 +1,195 @@
+import sqlite3
+from flask import Flask, render_template, request, g, url_for, redirect
+import re
+from collections import defaultdict
+
+#configuration
+DATABASE = 'reader_app.db'
+DEBUG = True
+SECRET_KEY = 'development key'
+
+#create our application
+app = Flask(__name__)
+app.config.from_object(__name__)
+
+def connect_to_db():
+    return sqlite3.connect(app.config['DATABASE'])
+
+@app.before_request
+def before_request():
+    g.db = connect_to_db()
+
+@app.teardown_request
+def teardown_request(exception):
+    db = getattr(g, 'db', None)
+    if db is not None:
+        db.close()
+
+@app.route('/')
+def index():
+    """
+    Show a list of text titles with links to the full text.
+    """
+    cur = g.db.execute('SELECT id, title FROM texts')
+    texts = [dict(text_id=row[0], title=row[1]) for row in cur.fetchall()]
+    return render_template('index.html', texts=texts)
+
+@app.route('/stats')
+def show_stats():
+    """
+    Show the top 100 unknown words in all texts along with the counts.
+    """
+    cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
+                          WHERE word NOT IN (SELECT word FROM known_words)
+                          ORDER BY word_count DESC, word ASC
+                          LIMIT 100""")
+    top_unknown_words = [(row[0], row[1]) for row in cur.fetchall()]
+    return render_template('stats.html', top_unknown_words=top_unknown_words)
+
+@app.route('/words')
+def show_words():
+    """
+    Show a list of all the known words.
+    """
+    cur = g.db.execute('SELECT word FROM known_words')
+    words = [row[0] for row in cur.fetchall()]
+    return render_template('words.html', words=words)
+
+@app.route('/upload_text', methods=['POST'])
+def upload_text():
+    """
+    Upload text to texts table, upload word counts from text to text_word_counts tables,
+    and update the total_word_counts table. 
+    """
+    if request.method == 'POST':
+        title = request.form['title']
+        text = request.form['text']
+        cur = g.db.execute('INSERT INTO texts (title, text) VALUES (?, ?)', [title, text])
+        text_id = cur.lastrowid
+        tokens = re.split('(\w*)', text)
+        words = [token.lower() for token in tokens if token.isalpha()]
+        word_counts = defaultdict(int)
+        for word in words:
+            word_counts[word] += 1
+        word_count_tuples = [(text_id, key, value) for key, value in word_counts.items()]
+        g.db.executemany('INSERT INTO text_word_counts VALUES (?, ?, ?)', word_count_tuples)
+        update_total_word_counts()
+        g.db.commit()
+        return redirect(url_for('index'))
+
+@app.route('/texts/<int:text_id>')
+def show_text(text_id):
+    """
+    Retrieve text from database, create a set of known words, create a dictionary of word_counts in the
+    text by querying the text_word_counts table, create a list of words and counts for all the unknown 
+    words that appear more than once in the text, and create a dictionary of statistics about the text.
+    """
+    cur = g.db.execute('SELECT title, text FROM texts WHERE id=?', [text_id])
+    row = cur.fetchone()
+    title = row[0]
+    text = row[1]
+    known_words = build_known_words_set()
+    token_tuple_lines = tokenize_text(text, known_words)
+    word_counts = build_word_counts_dict(text_id)
+    top_unknown_words = [(count, word) for word, count in word_counts.items() if count > 1 and word not in known_words]
+    top_unknown_words.sort(reverse=True)
+    stats_dict = calculate_text_statistics(word_counts, known_words)
+    return render_template('text.html', 
+                            text_id=text_id,
+                            title=title,
+                            token_tuple_lines=token_tuple_lines,
+                            top_unknown_words=top_unknown_words,
+                            stats_dict=stats_dict)
+
+@app.route('/delete_text/<int:text_id>', methods=['POST'])
+def delete_text(text_id):
+    """
+    Delete text from texts table as well as all the word counts associated with it in the text_word_counts
+    table, and update the total_word_counts table.
+    """
+    g.db.execute('DELETE FROM texts WHERE id = ?', [text_id])
+    g.db.execute('DELETE FROM text_word_counts WHERE text_id = ?', [text_id])
+    update_total_word_counts()
+    g.db.commit()
+    return redirect(url_for('index'))
+
+@app.route('/add_word', methods=['POST'])
+def add_word():
+    """
+    Inserts word into known_words table in database.
+    """
+    word = request.json
+    g.db.execute('INSERT INTO known_words (word) VALUES (?)', [word])
+    g.db.commit()
+    return 'post succesful'
+
+@app.route('/delete_word', methods=['POST'])
+def delete_word():
+    """
+    Deletes word from known_words table in database.
+    """
+    word = request.json
+    g.db.execute('DELETE FROM known_words WHERE word = ?', [word])
+    g.db.commit()
+    return 'post succesful'
+
+def tokenize_text(text, known_words):
+    """
+    Breaks up text into a list of lines where each lines is a list of tuples containing a token
+    and whether it is known, unknown, or a non-word.  Takes a text as a string and a set of
+    known known words as input.
+    """
+    lines = text.split('\n')
+    token_tuple_lines = []
+    for line in lines:
+        tokens = re.split('(\w*)', line)
+        token_tuples = []
+        for token in tokens:
+            if token.lower() in known_words:
+                token_tuples.append((token, 'known'))
+            elif token.isalpha():
+                token_tuples.append((token, 'unknown'))
+            else:
+                token_tuples.append((token, 'nonword'))
+        token_tuple_lines.append(token_tuples)
+    return token_tuple_lines
+
+def calculate_text_statistics(word_counts, known_words):
+    """
+    """
+    stats_dict = {}
+    stats_dict['word_count'] = sum(count for count in word_counts.values())
+    stats_dict['known_word_count'] = sum(count for word, count in word_counts.items() if word in known_words)
+    stats_dict['unknown_word_count'] = sum(count for word, count in word_counts.items() if word not in known_words)
+    stats_dict['percent_known'] = 100*stats_dict['known_word_count']/stats_dict['word_count']
+    return stats_dict
+
+def update_total_word_counts():
+    """
+    Runs the proper SQL statements to update the total_word_counts table.
+    """
+    g.db.execute('DELETE FROM total_word_counts')
+    g.db.execute("""INSERT INTO total_word_counts
+                    SELECT word, SUM(word_count)
+                    FROM text_word_counts
+                    GROUP BY word""")
+    g.db.commit()
+
+def build_known_words_set():
+    """
+    Builds a set composed of all the words in the known_words table.
+    """
+    cur = g.db.execute('SELECT word FROM known_words')
+    known_words = set(row[0] for row in cur.fetchall())
+    return known_words
+
+def build_word_counts_dict(text_id):
+    """
+    Builds a dictionary of word counts in a particular text.
+    """
+    cur = g.db.execute('SELECT word, word_count FROM text_word_counts WHERE text_id = ?', [text_id])
+    word_counts = {row[0]: row[1] for row in cur.fetchall()}
+    return word_counts
+
+if __name__ == '__main__':
+    app.run()

@@ -1,0 +1,19 @@
+body {
+    background-color: #d0e4fe;
+}
+
+h1 {
+    color: orange;
+}
+
+p {
+    color: black;
+}
+
+.known {
+    color: black;
+}
+
+.unknown {
+    color: yellow;
+}
