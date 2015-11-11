@@ -10,6 +10,11 @@ CREATE TABLE known_words (
     word TEXT PRIMARY KEY NOT NULL
 );
 
+DROP TABLE IF EXISTS learning_words;
+CREATE TABLE learning_words (
+    word TEXT PRIMARY KEY NOT NULL
+);
+
 DROP TABLE IF EXISTS text_word_counts;
 CREATE TABLE text_word_counts (
     text_id INTEGER NOT NULL,

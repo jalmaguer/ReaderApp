@@ -89,9 +89,11 @@ def show_text(text_id):
     title = row[0]
     text = row[1]
     known_words = build_known_words_set()
-    token_tuple_lines = tokenize_text(text, known_words)
+    learning_words = build_learning_words_set()
+    known_or_learning_words = known_words.union(learning_words)
+    token_tuple_lines = tokenize_text(text, known_words, learning_words)
     word_counts = build_word_counts_dict(text_id)
-    top_unknown_words = [(count, word) for word, count in word_counts.items() if count > 1 and word not in known_words]
+    top_unknown_words = [(count, word) for word, count in word_counts.items() if count > 1 and word not in known_or_learning_words]
     top_unknown_words.sort(reverse=True)
     stats_dict = calculate_text_statistics(word_counts, known_words)
     return render_template('text.html', 
@@ -113,27 +115,32 @@ def delete_text(text_id):
     g.db.commit()
     return redirect(url_for('index'))
 
-@app.route('/add_word', methods=['POST'])
-def add_word():
+@app.route('/update_word', methods=['POST'])
+def update_word():
     """
-    Inserts word into known_words table in database.
+    Updates word in database when postObject is passed from client.  The postObject is a javascript object
+    that contains fields for the word, the table to remove the word from, and the table to add the word to.
+    Nothing happens when one of these fields is 'unknown' because there is no unknown words table.
     """
-    word = request.json
-    g.db.execute('INSERT INTO known_words (word) VALUES (?)', [word])
+    postObject = request.json
+    word = postObject['word']
+    removeFrom = postObject['removeFrom']
+    addTo = postObject['addTo']
+
+    if removeFrom == 'known':
+        g.db.execute('DELETE FROM known_words (word) VALUES (?)', [word])
+    elif removeFrom == 'learning':
+        g.db.execute('DELETE FROM learning_words (word) VALUES (?)', [word])
+
+    if addTo == 'known':
+        g.db.execute('INSERT INTO known_words (word) VALUES (?)', [word])
+    elif addTo == 'learning':
+        g.db.execute('INSERT INTO learning_words (word) VALUES (?)', [word])
+
     g.db.commit()
     return 'post succesful'
 
-@app.route('/delete_word', methods=['POST'])
-def delete_word():
-    """
-    Deletes word from known_words table in database.
-    """
-    word = request.json
-    g.db.execute('DELETE FROM known_words WHERE word = ?', [word])
-    g.db.commit()
-    return 'post succesful'
-
-def tokenize_text(text, known_words):
+def tokenize_text(text, known_words, learning_words):
     """
     Breaks up text into a list of lines where each lines is a list of tuples containing a token
     and whether it is known, unknown, or a non-word.  Takes a text as a string and a set of
@@ -147,6 +154,8 @@ def tokenize_text(text, known_words):
         for token in tokens:
             if token.lower() in known_words:
                 token_tuples.append((token, 'known'))
+            elif token.lower() in learning_words:
+                token_tuples.append((token, 'learning'))
             elif token.isalpha():
                 token_tuples.append((token, 'unknown'))
             else:
@@ -156,6 +165,8 @@ def tokenize_text(text, known_words):
 
 def calculate_text_statistics(word_counts, known_words):
     """
+    Calculates a dictionary of statistics for a text.  Shows the number of words in a text, the number of known words,
+    the number of unknown words, and the percent of words that are known.
     """
     stats_dict = {}
     stats_dict['word_count'] = sum(count for count in word_counts.values())
@@ -182,6 +193,14 @@ def build_known_words_set():
     cur = g.db.execute('SELECT word FROM known_words')
     known_words = set(row[0] for row in cur.fetchall())
     return known_words
+
+def build_learning_words_set():
+    """
+    Builds a set composed of all the words in the learning_words table.
+    """
+    cur = g.db.execute('SELECT word FROM learning_words')
+    learning_words = set(row[0] for row in cur.fetchall())
+    return learning_words
 
 def build_word_counts_dict(text_id):
     """
