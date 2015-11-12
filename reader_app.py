@@ -131,9 +131,9 @@ def update_word():
     addTo = postObject['addTo']
 
     if removeFrom == 'known':
-        g.db.execute('DELETE FROM known_words (word) VALUES (?)', [word])
+        g.db.execute('DELETE FROM known_words WHERE word = ?', [word])
     elif removeFrom == 'learning':
-        g.db.execute('DELETE FROM learning_words (word) VALUES (?)', [word])
+        g.db.execute('DELETE FROM learning_words WHERE word = ?', [word])
 
     if addTo == 'known':
         g.db.execute('INSERT INTO known_words (word) VALUES (?)', [word])
