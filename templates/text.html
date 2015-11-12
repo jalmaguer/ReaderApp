@@ -17,6 +17,12 @@
             <li><span class="unknown">{{ word }}</span>: {{ count }}</li>
         {% endfor %}
         </ol>
+        <h1>Top Learning Words</h1>
+        <ol>
+        {% for count, word in top_learning_words %}
+            <li><span class="learning">{{ word }}</span>: {{ count }}</li>
+        {% endfor %}
+        </ol>
         <div>
             <h1>{{ title }}</h1>
             <p>

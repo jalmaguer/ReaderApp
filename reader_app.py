@@ -95,12 +95,15 @@ def show_text(text_id):
     word_counts = build_word_counts_dict(text_id)
     top_unknown_words = [(count, word) for word, count in word_counts.items() if count > 1 and word not in known_or_learning_words]
     top_unknown_words.sort(reverse=True)
+    top_learning_words = [(count, word) for word, count in word_counts.items() if count > 1 and word in learning_words]
+    top_learning_words.sort(reverse=True)
     stats_dict = calculate_text_statistics(word_counts, known_words)
     return render_template('text.html', 
                             text_id=text_id,
                             title=title,
                             token_tuple_lines=token_tuple_lines,
                             top_unknown_words=top_unknown_words,
+                            top_learning_words=top_learning_words,
                             stats_dict=stats_dict)
 
 @app.route('/delete_text/<int:text_id>', methods=['POST'])
