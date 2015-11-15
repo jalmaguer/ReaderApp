@@ -1,9 +1,21 @@
 <!doctype html>
 <html>
     <body>
-        <h1>Statistics</h1>
+        <h1>Top Words Overall</h1>
+        <ol>
+        {% for word, count in top_overall_words %}
+            <li>{{ word }}: {{ count }}</li>
+        {% endfor %}
+        </ol>
+        <h1>Top Unknown Words</h1>
         <ol>
         {% for word, count in top_unknown_words %}
+            <li>{{ word }}: {{ count }}</li>
+        {% endfor %}
+        </ol>
+        <h1>Top Learning Words</h1>
+        <ol>
+        {% for word, count in top_learning_words %}
             <li>{{ word }}: {{ count }}</li>
         {% endfor %}
         </ol>

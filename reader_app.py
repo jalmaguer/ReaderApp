@@ -40,11 +40,22 @@ def show_stats():
     Show the top 100 unknown words in all texts along with the counts.
     """
     cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
+                          ORDER BY word_count DESC, word ASC
+                          LIMIT 100""")
+    top_overall_words = [(row[0], row[1]) for row in cur.fetchall()]
+    cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
                           WHERE word NOT IN (SELECT word FROM known_words)
                           ORDER BY word_count DESC, word ASC
                           LIMIT 100""")
     top_unknown_words = [(row[0], row[1]) for row in cur.fetchall()]
-    return render_template('stats.html', top_unknown_words=top_unknown_words)
+    cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
+                          WHERE word IN (SELECT word FROM learning_words)
+                          ORDER BY word_count DESC, word ASC
+                          LIMIT 100""")
+    top_learning_words = [(row[0], row[1]) for row in cur.fetchall()]
+    return render_template('stats.html', top_overall_words=top_overall_words,
+                                         top_unknown_words=top_unknown_words,
+                                         top_learning_words=top_learning_words)
 
 @app.route('/known_words')
 def show_known_words():
