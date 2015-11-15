@@ -3,8 +3,10 @@
     <body>
         <h1>Stats</h1>
             <a href="{{ url_for('show_stats') }}">stats</a>
-        <h1>Words</h1>
-            <a href="{{ url_for('show_words') }}">words</a>
+        <h1>Known Words</h1>
+            <a href="{{ url_for('show_known_words') }}">known words</a>
+        <h1>Learning Words</h1>
+            <a href="{{ url_for('show_learning_words') }}">learning words</a>
         <h1>Texts</h1>
         <ul>
         {% for text in texts %}

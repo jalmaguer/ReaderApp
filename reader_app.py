@@ -46,14 +46,23 @@ def show_stats():
     top_unknown_words = [(row[0], row[1]) for row in cur.fetchall()]
     return render_template('stats.html', top_unknown_words=top_unknown_words)
 
-@app.route('/words')
-def show_words():
+@app.route('/known_words')
+def show_known_words():
     """
     Show a list of all the known words.
     """
     cur = g.db.execute('SELECT word FROM known_words')
     words = [row[0] for row in cur.fetchall()]
-    return render_template('words.html', words=words)
+    return render_template('known_words.html', words=words)
+
+@app.route('/learning_words')
+def show_learning_words():
+    """
+    Show a list of all the words being learned.
+    """
+    cur = g.db.execute('SELECT word FROM learning_words')
+    words = [row[0] for row in cur.fetchall()]
+    return render_template('learning_words.html', words=words)
 
 @app.route('/upload_text', methods=['POST'])
 def upload_text():
