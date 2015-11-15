@@ -6,9 +6,10 @@ Script to dumb database tables to csv files for database migrations.
 """
 
 def table_to_csv(table_name, column_names):
-    raw_sql = 'SELECT {column_names} FROM {table_name}'
+    raw_sql = 'SELECT {column_string} FROM {table_name}'
     column_string = ', '.join(column_names)
-    sql = raw_sql.format(table_name=table_name, column_names=column_string)
+    sql = raw_sql.format(table_name=table_name, 
+                         column_string=column_string)
     filename = 'data/{}.csv'.format(table_name)
     with open(filename, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
