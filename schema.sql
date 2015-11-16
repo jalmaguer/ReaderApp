@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS texts;
 CREATE TABLE texts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    collection_id INTEGER NOT NULL,
     title TEXT NOT NULL,
     text TEXT NOT NULL
 );
@@ -26,4 +27,10 @@ DROP TABLE IF EXISTS total_word_counts;
 CREATE TABLE total_word_counts (
     word TEXT NOT NULL,
     word_count INTEGER NOT NULL
+);
+
+DROP TABLE IF EXISTS collections;
+CREATE TABLE collections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL
 );

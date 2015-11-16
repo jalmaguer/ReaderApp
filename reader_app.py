@@ -28,11 +28,20 @@ def teardown_request(exception):
 @app.route('/')
 def index():
     """
-    Show a list of text titles with links to the full text.
+    Show a list of the collections of texts
     """
-    cur = g.db.execute('SELECT id, title FROM texts')
+    cur = g.db.execute('SELECT id, name FROM collections')
+    collections = [dict(collection_id=row[0], name=row[1]) for row in cur.fetchall()]
+    return render_template('index.html', collections=collections)
+
+@app.route('/collections/<int:collection_id>')
+def show_collection(collection_id):
+    """
+    Show a list of text titles in the collection with links to full text.
+    """
+    cur = g.db.execute('SELECT id, title FROM texts WHERE collection_id=?', [collection_id])
     texts = [dict(text_id=row[0], title=row[1]) for row in cur.fetchall()]
-    return render_template('index.html', texts=texts)
+    return render_template('collection.html', texts=texts, collection_id=collection_id)
 
 @app.route('/stats')
 def show_stats():
@@ -75,8 +84,8 @@ def show_learning_words():
     words = [row[0] for row in cur.fetchall()]
     return render_template('learning_words.html', words=words)
 
-@app.route('/upload_text', methods=['POST'])
-def upload_text():
+@app.route('/collections/<int:collection_id>/upload_text', methods=['POST'])
+def upload_text(collection_id):
     """
     Upload text to texts table, upload word counts from text to text_word_counts tables,
     and update the total_word_counts table. 
@@ -84,7 +93,7 @@ def upload_text():
     if request.method == 'POST':
         title = request.form['title']
         text = request.form['text']
-        cur = g.db.execute('INSERT INTO texts (title, text) VALUES (?, ?)', [title, text])
+        cur = g.db.execute('INSERT INTO texts (title, collection_id, text) VALUES (?, ?, ?)', [title, collection_id, text])
         text_id = cur.lastrowid
         tokens = re.split('(\w*)', text)
         words = [token.lower() for token in tokens if token.isalpha()]
@@ -95,7 +104,7 @@ def upload_text():
         g.db.executemany('INSERT INTO text_word_counts VALUES (?, ?, ?)', word_count_tuples)
         update_total_word_counts()
         g.db.commit()
-        return redirect(url_for('index'))
+    return redirect(url_for('show_collection', collection_id=collection_id))
 
 @app.route('/texts/<int:text_id>')
 def show_text(text_id):

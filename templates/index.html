@@ -7,21 +7,11 @@
             <a href="{{ url_for('show_known_words') }}">known words</a>
         <h1>Learning Words</h1>
             <a href="{{ url_for('show_learning_words') }}">learning words</a>
-        <h1>Texts</h1>
+        <h1>Collections</h1>
         <ul>
-        {% for text in texts %}
-            <li><h2><a href="{{ url_for('show_text', text_id=text.text_id) }}">{{ text.title }}</a></h2>
-        {% else %}
-            <li><em>No entries so far</em>
+        {% for collection in collections %}
+            <li><h2><a href="{{ url_for('show_collection', collection_id=collection.collection_id) }}">{{ collection.name }}</a></h2>
         {% endfor %}
         </ul>
-        <h1>Paste in a Text</h1>
-        <form action="{{ url_for('upload_text') }}" method=post>
-            <p>Text Name</p>
-            <input type=text name=title><br>
-            <p>Text</p>
-            <textarea name=text rows=15 cols=100></textarea><br>
-            <input type="submit">
-        </form>
     </body>
 </html>
