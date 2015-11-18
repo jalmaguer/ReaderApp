@@ -1,6 +1,8 @@
 <!doctype html>
 <html>
     <body>
+        <h1>Collection Stats</h1>
+            <a href="{{ url_for('show_collection_stats', collection_id=collection_id) }}">stats</a>
         <h1>Texts</h1>
         <ul>
         {% for text in texts %}

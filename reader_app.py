@@ -43,10 +43,42 @@ def show_collection(collection_id):
     texts = [dict(text_id=row[0], title=row[1]) for row in cur.fetchall()]
     return render_template('collection.html', texts=texts, collection_id=collection_id)
 
+@app.route('/collections/<int:collection_id>/stats')
+def show_collection_stats(collection_id):
+    """
+    Show the top 100 unknown words, words overall, and learning words in all texts
+    in a collection along with the word counts.
+    """
+    cur = g.db.execute("""SELECT word, SUM(word_count) FROM text_word_counts
+                          WHERE text_id IN (SELECT id FROM texts WHERE collection_id=?)
+                          GROUP BY word
+                          ORDER BY SUM(word_count) DESC, word ASC
+                          LIMIT 100""", [collection_id])
+    top_overall_words = [(row[0], row[1]) for row in cur.fetchall()]
+    cur = g.db.execute("""SELECT word, SUM(word_count) FROM text_word_counts
+                          WHERE text_id IN (SELECT id FROM texts WHERE collection_id=?)
+                          AND word NOT IN (SELECT word FROM known_words)
+                          AND word NOT IN (SELECT word FROM learning_words)
+                          GROUP BY word
+                          ORDER BY SUM(word_count) DESC, word ASC
+                          LIMIT 100""", [collection_id])
+    top_unknown_words = [(row[0], row[1]) for row in cur.fetchall()]
+    cur = g.db.execute("""SELECT word, SUM(word_count) FROM text_word_counts
+                          WHERE text_id IN (SELECT id FROM texts WHERE collection_id=?)
+                          AND word IN (SELECT word FROM learning_words)
+                          GROUP BY word
+                          ORDER BY SUM(word_count) DESC, word ASC
+                          LIMIT 100""", [collection_id])
+    top_learning_words = [(row[0], row[1]) for row in cur.fetchall()]
+    return render_template('stats.html', top_overall_words=top_overall_words,
+                                         top_unknown_words=top_unknown_words,
+                                         top_learning_words=top_learning_words)
+
 @app.route('/stats')
 def show_stats():
     """
-    Show the top 100 unknown words in all texts along with the counts.
+    Show the top 100 unknown words, words overall, and learning words in all texts
+    along with the counts.
     """
     cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
                           ORDER BY word_count DESC, word ASC
@@ -54,6 +86,7 @@ def show_stats():
     top_overall_words = [(row[0], row[1]) for row in cur.fetchall()]
     cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
                           WHERE word NOT IN (SELECT word FROM known_words)
+                          AND word NOT IN (SELECT word FROM learning_words)
                           ORDER BY word_count DESC, word ASC
                           LIMIT 100""")
     top_unknown_words = [(row[0], row[1]) for row in cur.fetchall()]
