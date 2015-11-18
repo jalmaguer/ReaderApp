@@ -70,9 +70,13 @@ def show_collection_stats(collection_id):
                           ORDER BY SUM(word_count) DESC, word ASC
                           LIMIT 100""", [collection_id])
     top_learning_words = [(row[0], row[1]) for row in cur.fetchall()]
+    word_counts = build_collection_word_counts_dict(collection_id)
+    known_words = build_known_words_set()
+    stats_dict = build_stats_dict(word_counts, known_words)
     return render_template('stats.html', top_overall_words=top_overall_words,
                                          top_unknown_words=top_unknown_words,
-                                         top_learning_words=top_learning_words)
+                                         top_learning_words=top_learning_words,
+                                         stats_dict=stats_dict)
 
 @app.route('/stats')
 def show_stats():
@@ -95,9 +99,14 @@ def show_stats():
                           ORDER BY word_count DESC, word ASC
                           LIMIT 100""")
     top_learning_words = [(row[0], row[1]) for row in cur.fetchall()]
+    cur = g.db.execute('SELECT word, word_count FROM total_word_counts')
+    word_counts = {row[0]: row[1] for row in cur.fetchall()}
+    known_words = build_known_words_set()
+    stats_dict = build_stats_dict(word_counts, known_words)
     return render_template('stats.html', top_overall_words=top_overall_words,
                                          top_unknown_words=top_unknown_words,
-                                         top_learning_words=top_learning_words)
+                                         top_learning_words=top_learning_words,
+                                         stats_dict=stats_dict)
 
 @app.route('/known_words')
 def show_known_words():
@@ -154,12 +163,12 @@ def show_text(text_id):
     learning_words = build_learning_words_set()
     known_or_learning_words = known_words.union(learning_words)
     token_tuple_lines = tokenize_text(text, known_words, learning_words)
-    word_counts = build_word_counts_dict(text_id)
+    word_counts = build_text_word_counts_dict(text_id)
     top_unknown_words = [(count, word) for word, count in word_counts.items() if count > 1 and word not in known_or_learning_words]
     top_unknown_words.sort(reverse=True)
     top_learning_words = [(count, word) for word, count in word_counts.items() if count > 1 and word in learning_words]
     top_learning_words.sort(reverse=True)
-    stats_dict = calculate_text_statistics(word_counts, known_words)
+    stats_dict = build_stats_dict(word_counts, known_words)
     return render_template('text.html', 
                             text_id=text_id,
                             title=title,
@@ -228,9 +237,9 @@ def tokenize_text(text, known_words, learning_words):
         token_tuple_lines.append(token_tuples)
     return token_tuple_lines
 
-def calculate_text_statistics(word_counts, known_words):
+def build_stats_dict(word_counts, known_words):
     """
-    Calculates a dictionary of statistics for a text.  Shows the number of words in a text, the number of known words,
+    Calculates a dictionary of statistics for a text or collection.  Shows the number of words in a text, the number of known words,
     the number of unknown words, and the percent of words that are known.
     """
     stats_dict = {}
@@ -267,11 +276,22 @@ def build_learning_words_set():
     learning_words = set(row[0] for row in cur.fetchall())
     return learning_words
 
-def build_word_counts_dict(text_id):
+def build_text_word_counts_dict(text_id):
     """
     Builds a dictionary of word counts in a particular text.
     """
     cur = g.db.execute('SELECT word, word_count FROM text_word_counts WHERE text_id = ?', [text_id])
+    word_counts = {row[0]: row[1] for row in cur.fetchall()}
+    return word_counts
+
+def build_collection_word_counts_dict(collection_id):
+    """
+    Build a dictionary of word counts in a collection
+    """
+    cur = g.db.execute("""SELECT word, SUM(word_count)
+                          FROM text_word_counts
+                          WHERE text_id IN (SELECT id FROM texts WHERE collection_id=?)
+                          GROUP BY word""", [collection_id])
     word_counts = {row[0]: row[1] for row in cur.fetchall()}
     return word_counts
 
