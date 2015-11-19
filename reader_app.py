@@ -148,6 +148,17 @@ def upload_text(collection_id):
         g.db.commit()
     return redirect(url_for('show_collection', collection_id=collection_id))
 
+@app.route('/create_collection', methods=['POST'])
+def create_collection():
+    """
+    Create a new collection
+    """
+    if request.method == 'POST':
+        name = request.form['name']
+        cur = g.db.execute('INSERT INTO collections (name) VALUES (?)', [name])
+        g.db.commit()
+    return redirect(url_for('index'))
+
 @app.route('/texts/<int:text_id>')
 def show_text(text_id):
     """
@@ -188,6 +199,21 @@ def delete_text(text_id):
     update_total_word_counts()
     g.db.commit()
     return redirect(url_for('index'))
+
+@app.route('/delete_collection/<int:collection_id>', methods=['POST'])
+def delete_collection(collection_id):
+    """
+    Delete collection from collections table.  Will only allow a collection to be deleted if it is empty.
+    """
+    cur = g.db.execute('SELECT COUNT(*) FROM texts WHERE collection_id=?', [collection_id])
+    texts_in_collection = cur.fetchone()[0]
+    if texts_in_collection == 0:
+        g.db.execute('DELETE FROM collections WHERE id=?', [collection_id])
+        g.db.commit()
+        return redirect(url_for('index'))
+    else:
+        print('Can not delete collection that is not empty')
+        return redirect(url_for('show_collection', collection_id=collection_id))
 
 @app.route('/update_word', methods=['POST'])
 def update_word():

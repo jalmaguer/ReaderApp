@@ -13,5 +13,11 @@
             <li><h2><a href="{{ url_for('show_collection', collection_id=collection.collection_id) }}">{{ collection.name }}</a></h2>
         {% endfor %}
         </ul>
+        <h1>Create New Collection</h1>
+        <form action="{{ url_for('create_collection') }}" method=post>
+            <p>Collection Name</p>
+            <input type=text name=name><br>
+            <input type="submit">
+        </form>
     </body>
 </html>
