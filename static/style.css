@@ -25,3 +25,9 @@ p {
 .textcontainer {
     width: 500px;
 }
+
+#translation {
+    position: fixed;
+    top: 2%;
+    right: 2%;
+}

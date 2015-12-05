@@ -1,16 +1,13 @@
 import sqlite3
-from flask import Flask, render_template, request, g, url_for, redirect
+from flask import Flask, render_template, request, g, url_for, redirect, jsonify
+from config import MS_TRANSLATOR_CLIENT_ID, MS_TRANSLATOR_CLIENT_SECRET
 import re
 from collections import defaultdict
-
-#configuration
-DATABASE = 'reader_app.db'
-DEBUG = True
-SECRET_KEY = 'development key'
+import requests
 
 #create our application
 app = Flask(__name__)
-app.config.from_object(__name__)
+app.config.from_object('config')
 
 def connect_to_db():
     return sqlite3.connect(app.config['DATABASE'])
@@ -240,6 +237,10 @@ def update_word():
     g.db.commit()
     return 'post succesful'
 
+@app.route('/translate', methods=['POST'])
+def translate():
+    return jsonify({'text': microsoft_translate(request.form['text'])})
+
 def tokenize_text(text, known_words, learning_words):
     """
     Breaks up text into a list of lines where each lines is a list of tuples containing a token
@@ -320,6 +321,27 @@ def build_collection_word_counts_dict(collection_id):
                           GROUP BY word""", [collection_id])
     word_counts = {row[0]: row[1] for row in cur.fetchall()}
     return word_counts
+
+def microsoft_translate(text):
+    # get access token
+    params = {
+        'client_id': MS_TRANSLATOR_CLIENT_ID,
+        'client_secret': MS_TRANSLATOR_CLIENT_SECRET,
+        'scope': 'http://api.microsofttranslator.com',
+        'grant_type': 'client_credentials'}
+    url = 'https://datamarket.accesscontrol.windows.net/v2/OAuth2-13'
+    r = requests.post(url, data=params)
+    token = r.json()['access_token']
+
+    # translate
+    params = {'appId': 'Bearer ' + token,
+              'from': 'de',
+              'to': 'en',
+              'text': text}
+    url = 'http://api.microsofttranslator.com/V2/Ajax.svc/Translate'
+    r = requests.get(url, params=params)
+    r.encoding = 'utf-8-sig'
+    return r.text
 
 if __name__ == '__main__':
     app.run()

@@ -10,6 +10,14 @@ var postToDatabase = function(postObject) {
     });
 };
 
+var translate = function(word) {
+    $.post('/translate', {
+        text: word
+    }).done(function(translated) {
+        return translated['text'];
+    });
+};
+
 var main = function() {
     $(document).on('click', '.unknown', function() {
         var word = $(this).text().toLowerCase();
@@ -33,6 +41,15 @@ var main = function() {
         elementArray.removeClass('known').addClass('unknown');
         var postObject = {word:word, removeFrom:'known', addTo:'unknown'}
         postToDatabase(postObject);
+    });
+
+    $('span').click(function() {
+        var word = $(this).text();
+        $.post('/translate', {
+            text: word
+        }).done(function(translated) {
+            $('#translation').text(translated['text']);
+        });
     });
 };
 
