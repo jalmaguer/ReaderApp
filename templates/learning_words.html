@@ -1,11 +1,9 @@
-<!doctype html>
-<html>
-    <body>
-        <h1>Learning Words</h1>
-        <ol>
-        {% for word in words %}
-            <li>{{ word }}</li>
-        {% endfor %}
-        </ol>
-    </body>
-</html>
+{% extends "layout.html" %}
+{% block body %}
+    <h1>Learning Words</h1>
+    <ol>
+    {% for word in words %}
+        <li>{{ word }}</li>
+    {% endfor %}
+    </ol>
+{% endblock %}

@@ -1,23 +1,21 @@
-<!doctype html>
-<html>
-    <body>
-        <h1>Stats</h1>
-            <a href="{{ url_for('show_stats') }}">stats</a>
-        <h1>Known Words</h1>
-            <a href="{{ url_for('show_known_words') }}">known words</a>
-        <h1>Learning Words</h1>
-            <a href="{{ url_for('show_learning_words') }}">learning words</a>
-        <h1>Collections</h1>
-        <ul>
-        {% for collection in collections %}
-            <li><h2><a href="{{ url_for('show_collection', collection_id=collection.collection_id) }}">{{ collection.name }}</a></h2>
-        {% endfor %}
-        </ul>
-        <h1>Create New Collection</h1>
-        <form action="{{ url_for('create_collection') }}" method=post>
-            <p>Collection Name</p>
-            <input type=text name=name><br>
-            <input type="submit">
-        </form>
-    </body>
-</html>
+{% extends "layout.html" %}
+{% block body %}
+    <h1>Stats</h1>
+        <a href="{{ url_for('show_stats') }}">stats</a>
+    <h1>Known Words</h1>
+        <a href="{{ url_for('show_known_words') }}">known words</a>
+    <h1>Learning Words</h1>
+        <a href="{{ url_for('show_learning_words') }}">learning words</a>
+    <h1>Collections</h1>
+    <ul>
+    {% for collection in collections %}
+        <li><h2><a href="{{ url_for('show_collection', collection_id=collection.collection_id) }}">{{ collection.name }}</a></h2>
+    {% endfor %}
+    </ul>
+    <h1>Create New Collection</h1>
+    <form action="{{ url_for('create_collection') }}" method=post>
+        <p>Collection Name</p>
+        <input type=text name=name><br>
+        <input type="submit">
+    </form>
+{% endblock %}
