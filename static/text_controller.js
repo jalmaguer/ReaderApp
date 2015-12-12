@@ -10,46 +10,61 @@ var postToDatabase = function(postObject) {
     });
 };
 
-var translate = function(word) {
-    $.post('/translate', {
-        text: word
-    }).done(function(translated) {
-        return translated['text'];
-    });
-};
-
 var main = function() {
-    $(document).on('click', '.unknown', function() {
-        var word = $(this).text().toLowerCase();
-        var elementArray = $('span').filter(function() { return ($(this).text().toLowerCase() === word) });
-        elementArray.removeClass('unknown').addClass('learning');
-        var postObject = {word:word, removeFrom:'unknown', addTo:'learning'}
-        postToDatabase(postObject);
-    });
-
-    $(document).on('click', '.learning', function() {
-        var word = $(this).text().toLowerCase();
-        var elementArray = $('span').filter(function() { return ($(this).text().toLowerCase() === word) });
-        elementArray.removeClass('learning').addClass('known');
-        var postObject = {word:word, removeFrom:'learning', addTo:'known'}
-        postToDatabase(postObject);
-    });
-
-    $(document).on('click', '.known', function() {
-        var word = $(this).text().toLowerCase();
-        var elementArray = $('span').filter(function() { return ($(this).text().toLowerCase() === word) });
-        elementArray.removeClass('known').addClass('unknown');
-        var postObject = {word:word, removeFrom:'known', addTo:'unknown'}
-        postToDatabase(postObject);
-    });
-
+    //TODO: only allow one popover to be open at a time
     $('span').click(function() {
-        var word = $(this).text();
+        var e = $(this);
+        var word = e.text();
+        var wordClass;
+        if (e.hasClass('known')) {
+            wordClass = 'known';
+        } else if (e.hasClass('unknown')) {
+            wordClass = 'unknown';
+        } else if (e.hasClass('learning')) {
+            wordClass = 'learning';
+        }
+        var popOverHiddenContent = $('#popoverHiddenContent');
+        popOverHiddenContent.find('button').removeClass('active');
+        popOverHiddenContent.find('.btn-' + wordClass).addClass('active');
+        var popOverSettings = {
+            html: true,
+            title: word,
+            content: function() {
+                return popOverHiddenContent.html();
+            },
+            trigger: 'click'
+        };
+        e.popover(popOverSettings);
+    });
+
+    $(document).on('click', '.btn-translate', function() {
+        var popover = $(this).parents('.popover');
+        var word = popover.children('.popover-title').text();
+        var loader = popover.find('.loading-gif');
+        var translationContainer = popover.find('.translation-container');
+        loader.show();
         $.post('/translate', {
             text: word
         }).done(function(translated) {
-            $('#translation').text(translated['text']);
+            loader.hide();
+            var translatedWord = translated['text'];
+            translationContainer.text(translatedWord);
+            translationContainer.show();
         });
+    });
+
+    $(document).on('click', '.word-class-buttons button', function() {
+        var popover = $(this).parents('.popover');
+        var word = popover.children('.popover-title').text().toLowerCase();
+        var activeButton = popover.find('.active');
+        activeButton.removeClass('active');
+        var oldWordClass = activeButton.text().toLowerCase();
+        var newWordClass = $(this).text().toLowerCase();
+        $(this).addClass('active');
+        var elementArray = $('span').filter(function() { return ($(this).text().toLowerCase() === word) });
+        elementArray.removeClass(oldWordClass).addClass(newWordClass);
+        var postObject = {word:word, removeFrom:oldWordClass, addTo:newWordClass};
+        postToDatabase(postObject);
     });
 };
 

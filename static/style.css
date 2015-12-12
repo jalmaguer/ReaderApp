@@ -14,8 +14,47 @@ body {
     color: orange;
 }
 
-#translation {
-    position: fixed;
-    top: 2%;
-    right: 2%;
+.btn-known {
+  background-color: white;
+  color: green;
+}
+
+.btn-known:hover,
+.btn-known:focus,
+.btn-known:active,
+.btn-known.active,
+.btn-known.active:hover,
+.btn-known.active:focus {
+  background-color: green;
+  color: white;
+}
+
+.btn-learning {
+  background-color: white;
+  color: red;
+}
+
+.btn-learning:hover,
+.btn-learning:focus,
+.btn-learning:active,
+.btn-learning.active,
+.btn-learning.active:hover,
+.btn-learning.active:focus {
+  background-color: red;
+  color: white;
+}
+
+.btn-unknown {
+  background-color: white;
+  color: orange;
+}
+
+.btn-unknown:hover,
+.btn-unknown:focus,
+.btn-unknown:active,
+.btn-unknown.active,
+.btn-unknown.active:hover,
+.btn-unknown.active:focus {
+  background-color: orange;
+  color: white;
 }

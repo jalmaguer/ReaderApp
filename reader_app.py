@@ -341,7 +341,8 @@ def microsoft_translate(text):
     url = 'http://api.microsofttranslator.com/V2/Ajax.svc/Translate'
     r = requests.get(url, params=params)
     r.encoding = 'utf-8-sig'
-    return r.text
+    translation = r.text[1:-1]
+    return translation
 
 if __name__ == '__main__':
     app.run()
