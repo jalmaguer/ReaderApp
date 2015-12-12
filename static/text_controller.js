@@ -29,6 +29,7 @@ var main = function() {
         var popOverSettings = {
             html: true,
             title: word,
+            placement: 'top',
             content: function() {
                 return popOverHiddenContent.html();
             },
@@ -65,6 +66,13 @@ var main = function() {
         elementArray.removeClass(oldWordClass).addClass(newWordClass);
         var postObject = {word:word, removeFrom:oldWordClass, addTo:newWordClass};
         postToDatabase(postObject);
+    });
+
+    //close popovers by clicking outside
+    $(document).on('click', function(e) {
+      if (typeof $(e.target).data('original-title') == 'undefined' && !$(e.target).parents().is('.popover.in')) {
+        $('[data-original-title]').popover('hide');
+      }
     });
 };
 
