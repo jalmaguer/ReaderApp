@@ -1,6 +1,7 @@
 import sqlite3
 from flask import Flask, render_template, request, g, url_for, redirect, jsonify
-from config import MS_TRANSLATOR_CLIENT_ID, MS_TRANSLATOR_CLIENT_SECRET
+from flask.ext.login import UserMixin, login_required, login_user, logout_user, LoginManager
+from config import MS_TRANSLATOR_CLIENT_ID, MS_TRANSLATOR_CLIENT_SECRET, USERS
 import re
 from collections import defaultdict
 import requests
@@ -8,6 +9,25 @@ import requests
 #create our application
 app = Flask(__name__)
 app.config.from_object('config')
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+class User(UserMixin):
+    pass
+
+@login_manager.user_loader
+def user_loader(username):
+    if username not in USERS:
+        return
+
+    user = User()
+    user.id = username
+    return user
+
+@login_manager.unauthorized_handler
+def unauthorized_handler():
+    return redirect(url_for('login'))
 
 def connect_to_db():
     return sqlite3.connect(app.config['DATABASE'])
@@ -22,7 +42,27 @@ def teardown_request(exception):
     if db is not None:
         db.close()
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'GET':
+        return render_template('login.html')
+
+    username = request.form['username']
+    if request.form['pw'] == USERS[username]['pw']:
+        user = User()
+        user.id = username
+        login_user(user)
+        return redirect(url_for('index'))
+
+    return redirect(url_for('login'))
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
 @app.route('/')
+@login_required
 def index():
     """
     Show a list of the collections of texts
@@ -32,6 +72,7 @@ def index():
     return render_template('index.html', collections=collections)
 
 @app.route('/collections/<int:collection_id>')
+@login_required
 def show_collection(collection_id):
     """
     Show a list of text titles in the collection with links to full text.
@@ -41,6 +82,7 @@ def show_collection(collection_id):
     return render_template('collection.html', texts=texts, collection_id=collection_id)
 
 @app.route('/collections/<int:collection_id>/stats')
+@login_required
 def show_collection_stats(collection_id):
     """
     Show the top 100 unknown words, words overall, and learning words in all texts
@@ -76,6 +118,7 @@ def show_collection_stats(collection_id):
                                          stats_dict=stats_dict)
 
 @app.route('/stats')
+@login_required
 def show_stats():
     """
     Show the top 100 unknown words, words overall, and learning words in all texts
@@ -106,6 +149,7 @@ def show_stats():
                                          stats_dict=stats_dict)
 
 @app.route('/known_words')
+@login_required
 def show_known_words():
     """
     Show a list of all the known words.
@@ -115,6 +159,7 @@ def show_known_words():
     return render_template('known_words.html', words=words)
 
 @app.route('/learning_words')
+@login_required
 def show_learning_words():
     """
     Show a list of all the words being learned.
@@ -124,6 +169,7 @@ def show_learning_words():
     return render_template('learning_words.html', words=words)
 
 @app.route('/collections/<int:collection_id>/upload_text', methods=['POST'])
+@login_required
 def upload_text(collection_id):
     """
     Upload text to texts table, upload word counts from text to text_word_counts tables,
@@ -146,6 +192,7 @@ def upload_text(collection_id):
     return redirect(url_for('show_collection', collection_id=collection_id))
 
 @app.route('/create_collection', methods=['POST'])
+@login_required
 def create_collection():
     """
     Create a new collection
@@ -157,6 +204,7 @@ def create_collection():
     return redirect(url_for('index'))
 
 @app.route('/texts/<int:text_id>')
+@login_required
 def show_text(text_id):
     """
     Retrieve text from database, create a set of known words, create a dictionary of word_counts in the
@@ -186,6 +234,7 @@ def show_text(text_id):
                             stats_dict=stats_dict)
 
 @app.route('/delete_text/<int:text_id>', methods=['POST'])
+@login_required
 def delete_text(text_id):
     """
     Delete text from texts table as well as all the word counts associated with it in the text_word_counts
@@ -198,6 +247,7 @@ def delete_text(text_id):
     return redirect(url_for('index'))
 
 @app.route('/delete_collection/<int:collection_id>', methods=['POST'])
+@login_required
 def delete_collection(collection_id):
     """
     Delete collection from collections table.  Will only allow a collection to be deleted if it is empty.
@@ -213,6 +263,7 @@ def delete_collection(collection_id):
         return redirect(url_for('show_collection', collection_id=collection_id))
 
 @app.route('/update_word', methods=['POST'])
+@login_required
 def update_word():
     """
     Updates word in database when postObject is passed from client.  The postObject is a javascript object
@@ -238,6 +289,7 @@ def update_word():
     return 'post succesful'
 
 @app.route('/translate', methods=['POST'])
+@login_required
 def translate():
     return jsonify({'text': microsoft_translate(request.form['text'])})
 
