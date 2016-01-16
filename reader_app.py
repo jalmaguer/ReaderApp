@@ -1,7 +1,7 @@
 import sqlite3
 from flask import Flask, render_template, request, g, url_for, redirect, jsonify
-from flask.ext.login import UserMixin, login_required, login_user, logout_user, LoginManager
-from config import MS_TRANSLATOR_CLIENT_ID, MS_TRANSLATOR_CLIENT_SECRET, USERS
+from flask.ext.login import UserMixin, login_required, login_user, logout_user, LoginManager, current_user
+from config import MS_TRANSLATOR_CLIENT_ID, MS_TRANSLATOR_CLIENT_SECRET
 import re
 from collections import defaultdict
 import requests
@@ -17,12 +17,13 @@ class User(UserMixin):
     pass
 
 @login_manager.user_loader
-def user_loader(username):
-    if username not in USERS:
-        return
-
+def user_loader(user_id):
+    cur = g.db.execute('SELECT id, username FROM users WHERE id=?', [user_id])
+    row = cur.fetchone()
+    username = row[1]
     user = User()
-    user.id = username
+    user.id = user_id
+    user.username = username
     return user
 
 @login_manager.unauthorized_handler
@@ -35,6 +36,7 @@ def connect_to_db():
 @app.before_request
 def before_request():
     g.db = connect_to_db()
+    g.user = current_user
 
 @app.teardown_request
 def teardown_request(exception):
@@ -48,9 +50,16 @@ def login():
         return render_template('login.html')
 
     username = request.form['username']
-    if request.form['pw'] == USERS[username]['pw']:
+    cur = g.db.execute('SELECT id, username, password FROM users WHERE username=?', [username])
+    row = cur.fetchone()
+    user_id = row[0]
+    password = row[2]
+    if row is None:
+        return redirect(url_for('login'))
+    if request.form['pw'] == password:
         user = User()
-        user.id = username
+        user.id = user_id
+        user.username = username
         login_user(user)
         return redirect(url_for('index'))
 
@@ -281,9 +290,9 @@ def update_word():
         g.db.execute('DELETE FROM learning_words WHERE word = ?', [word])
 
     if addTo == 'known':
-        g.db.execute('INSERT INTO known_words (word) VALUES (?)', [word])
+        g.db.execute('INSERT INTO known_words (user_id, language_id, word) VALUES (?, ?, ?)', [g.user.id, 1, word])
     elif addTo == 'learning':
-        g.db.execute('INSERT INTO learning_words (word) VALUES (?)', [word])
+        g.db.execute('INSERT INTO learning_words (user_id, language_id, word) VALUES (?, ?, ?)', [g.user.id, 1, word])
 
     g.db.commit()
     return 'post succesful'
