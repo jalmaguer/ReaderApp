@@ -11,6 +11,8 @@ var postToDatabase = function(postObject) {
 };
 
 var main = function() {
+    var languageID = parseInt($('#languageIDHiddenContent').text());
+
     //TODO: only allow one popover to be open at a time
     $('span').click(function() {
         var e = $(this);
@@ -64,7 +66,7 @@ var main = function() {
         $(this).addClass('active');
         var elementArray = $('span').filter(function() { return ($(this).text().toLowerCase() === word) });
         elementArray.removeClass(oldWordClass).addClass(newWordClass);
-        var postObject = {word:word, removeFrom:oldWordClass, addTo:newWordClass};
+        var postObject = {word:word, removeFrom:oldWordClass, addTo:newWordClass, languageID:languageID};
         postToDatabase(postObject);
     });
 

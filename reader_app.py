@@ -74,11 +74,25 @@ def logout():
 @login_required
 def index():
     """
-    Show a list of the collections of texts
+    Show a list of languages that collections can be created for.
     """
-    cur = g.db.execute('SELECT id, name FROM collections')
+    cur = g.db.execute('SELECT id, language FROM languages')
+    languages = [dict(id=row[0], name=row[1]) for row in cur.fetchall()]
+    print(languages)
+    return render_template('languages.html', languages=languages)
+
+@app.route('/languages/<int:language_id>')
+@login_required
+def show_language_collections(language_id):
+    """
+    Show a list of the collections of the text for a particular language.
+    """
+    cur = g.db.execute("""SELECT id, name
+                          FROM collections
+                          WHERE user_id=?
+                          AND language_id=?""", [g.user.id, language_id])
     collections = [dict(collection_id=row[0], name=row[1]) for row in cur.fetchall()]
-    return render_template('index.html', collections=collections)
+    return render_template('index.html', collections=collections, language_id=language_id)
 
 @app.route('/collections/<int:collection_id>')
 @login_required
@@ -118,62 +132,80 @@ def show_collection_stats(collection_id):
                           ORDER BY SUM(word_count) DESC, word ASC
                           LIMIT 100""", [collection_id])
     top_learning_words = [(row[0], row[1]) for row in cur.fetchall()]
+    cur = g.db.execute('SELECT language_id FROM collections WHERE id = ?', [collection_id])
+    row = cur.fetchone()
+    language_id = row[0]
     word_counts = build_collection_word_counts_dict(collection_id)
-    known_words = build_known_words_set()
+    known_words = build_known_words_set(g.user.id, language_id)
     stats_dict = build_stats_dict(word_counts, known_words)
     return render_template('stats.html', top_overall_words=top_overall_words,
                                          top_unknown_words=top_unknown_words,
                                          top_learning_words=top_learning_words,
                                          stats_dict=stats_dict)
 
-@app.route('/stats')
+@app.route('/languages/<int:language_id>/stats')
 @login_required
-def show_stats():
+def show_language_stats(language_id):
     """
     Show the top 100 unknown words, words overall, and learning words in all texts
     along with the counts.
     """
     cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
+                          WHERE user_id=?
+                          AND language_id=?
                           ORDER BY word_count DESC, word ASC
-                          LIMIT 100""")
+                          LIMIT 100""", [g.user.id, language_id])
     top_overall_words = [(row[0], row[1]) for row in cur.fetchall()]
     cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
                           WHERE word NOT IN (SELECT word FROM known_words)
                           AND word NOT IN (SELECT word FROM learning_words)
+                          AND user_id=?
+                          AND language_id=?
                           ORDER BY word_count DESC, word ASC
-                          LIMIT 100""")
+                          LIMIT 100""", [g.user.id, language_id])
     top_unknown_words = [(row[0], row[1]) for row in cur.fetchall()]
     cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
                           WHERE word IN (SELECT word FROM learning_words)
+                          AND user_id=?
+                          AND language_id=?
                           ORDER BY word_count DESC, word ASC
-                          LIMIT 100""")
+                          LIMIT 100""", [g.user.id, language_id])
     top_learning_words = [(row[0], row[1]) for row in cur.fetchall()]
-    cur = g.db.execute('SELECT word, word_count FROM total_word_counts')
+    cur = g.db.execute("""SELECT word, word_count 
+                          FROM total_word_counts
+                          WHERE user_id=?
+                          AND language_id=?""", [g.user.id, language_id])
     word_counts = {row[0]: row[1] for row in cur.fetchall()}
-    known_words = build_known_words_set()
+    known_words = build_known_words_set(g.user.id, language_id)
     stats_dict = build_stats_dict(word_counts, known_words)
     return render_template('stats.html', top_overall_words=top_overall_words,
                                          top_unknown_words=top_unknown_words,
                                          top_learning_words=top_learning_words,
                                          stats_dict=stats_dict)
 
-@app.route('/known_words')
+@app.route('/known_words/<int:language_id>')
 @login_required
-def show_known_words():
+def show_known_words(language_id):
     """
     Show a list of all the known words.
     """
-    cur = g.db.execute('SELECT word FROM known_words')
+    cur = g.db.execute("""SELECT word
+                          FROM known_words
+                          WHERE user_id=?
+                          AND language_id=?""", [g.user.id, language_id])
     words = [row[0] for row in cur.fetchall()]
     return render_template('known_words.html', words=words)
 
-@app.route('/learning_words')
+@app.route('/learning_words/<int:language_id>')
 @login_required
-def show_learning_words():
+def show_learning_words(language_id):
     """
     Show a list of all the words being learned.
     """
-    cur = g.db.execute('SELECT word FROM learning_words')
+    cur = g.db.execute("""SELECT word
+                          FROM learning_words
+                          WHERE user_id=?
+                          AND language_id=?""", [g.user.id, language_id])
     words = [row[0] for row in cur.fetchall()]
     return render_template('learning_words.html', words=words)
 
@@ -187,28 +219,33 @@ def upload_text(collection_id):
     if request.method == 'POST':
         title = request.form['title']
         text = request.form['text']
-        cur = g.db.execute('INSERT INTO texts (title, collection_id, text) VALUES (?, ?, ?)', [title, collection_id, text])
+        cur = g.db.execute('SELECT language_id FROM collections WHERE id = ?', [collection_id])
+        row = cur.fetchone()
+        language_id = row[0]
+        cur = g.db.execute("""INSERT INTO texts (user_id, language_id, collection_id, title, text) 
+                              VALUES (?, ?, ?, ?, ?)""", [g.user.id, language_id, collection_id, title, text])
         text_id = cur.lastrowid
         tokens = re.split('(\w*)', text)
         words = [token.lower() for token in tokens if token.isalpha()]
         word_counts = defaultdict(int)
         for word in words:
             word_counts[word] += 1
-        word_count_tuples = [(text_id, key, value) for key, value in word_counts.items()]
-        g.db.executemany('INSERT INTO text_word_counts VALUES (?, ?, ?)', word_count_tuples)
-        update_total_word_counts()
+        word_count_tuples = [(g.user.id, language_id, text_id, key, value) for key, value in word_counts.items()]
+        g.db.executemany("""INSERT INTO text_word_counts (user_id, language_id, text_id, word, word_count)
+                            VALUES (?, ?, ?, ?, ?)""", word_count_tuples)
+        update_total_word_counts(g.user.id, language_id)
         g.db.commit()
     return redirect(url_for('show_collection', collection_id=collection_id))
 
-@app.route('/create_collection', methods=['POST'])
+@app.route('/languages/<int:language_id>/create_collection', methods=['POST'])
 @login_required
-def create_collection():
+def create_collection(language_id):
     """
     Create a new collection
     """
     if request.method == 'POST':
         name = request.form['name']
-        cur = g.db.execute('INSERT INTO collections (name) VALUES (?)', [name])
+        cur = g.db.execute('INSERT INTO collections (user_id, language_id, name) VALUES (?, ?, ?)', [g.user.id, language_id, name])
         g.db.commit()
     return redirect(url_for('index'))
 
@@ -220,12 +257,14 @@ def show_text(text_id):
     text by querying the text_word_counts table, create a list of words and counts for all the unknown 
     words that appear more than once in the text, and create a dictionary of statistics about the text.
     """
-    cur = g.db.execute('SELECT title, text FROM texts WHERE id=?', [text_id])
+    #TODO: need to fix this so that users can't go to each others texts by simply inputting the correct URL
+    cur = g.db.execute('SELECT title, text, language_id FROM texts WHERE id=?', [text_id])
     row = cur.fetchone()
     title = row[0]
     text = row[1]
-    known_words = build_known_words_set()
-    learning_words = build_learning_words_set()
+    language_id = row[2]
+    known_words = build_known_words_set(g.user.id, language_id)
+    learning_words = build_learning_words_set(g.user.id, language_id)
     known_or_learning_words = known_words.union(learning_words)
     token_tuple_lines = tokenize_text(text, known_words, learning_words)
     word_counts = build_text_word_counts_dict(text_id)
@@ -237,6 +276,7 @@ def show_text(text_id):
     return render_template('text.html', 
                             text_id=text_id,
                             title=title,
+                            language_id=language_id,
                             token_tuple_lines=token_tuple_lines,
                             top_unknown_words=top_unknown_words,
                             top_learning_words=top_learning_words,
@@ -249,9 +289,12 @@ def delete_text(text_id):
     Delete text from texts table as well as all the word counts associated with it in the text_word_counts
     table, and update the total_word_counts table.
     """
+    #TODO: only allow users to delete their own texts
+    cur = g.db.execute('SELECT language_id FROM texts WHERE id = ?', [text_id])
+    language_id = cur.fetchone()[0]
     g.db.execute('DELETE FROM texts WHERE id = ?', [text_id])
     g.db.execute('DELETE FROM text_word_counts WHERE text_id = ?', [text_id])
-    update_total_word_counts()
+    update_total_word_counts(g.db.user_id, language_id)
     g.db.commit()
     return redirect(url_for('index'))
 
@@ -283,16 +326,23 @@ def update_word():
     word = postObject['word']
     removeFrom = postObject['removeFrom']
     addTo = postObject['addTo']
+    language_id = postObject['languageID']
 
     if removeFrom == 'known':
-        g.db.execute('DELETE FROM known_words WHERE word = ?', [word])
+        g.db.execute("""DELETE FROM known_words
+                        WHERE user_id = ?
+                        AND language_id = ?
+                        AND word = ?""", [g.user.id, language_id, word])
     elif removeFrom == 'learning':
-        g.db.execute('DELETE FROM learning_words WHERE word = ?', [word])
+        g.db.execute("""DELETE FROM learning_words
+                        WHERE user_id = ?
+                        AND language_id = ?
+                        AND word = ?""", [g.user.id, language_id, word])
 
     if addTo == 'known':
-        g.db.execute('INSERT INTO known_words (user_id, language_id, word) VALUES (?, ?, ?)', [g.user.id, 1, word])
+        g.db.execute('INSERT INTO known_words (user_id, language_id, word) VALUES (?, ?, ?)', [g.user.id, language_id, word])
     elif addTo == 'learning':
-        g.db.execute('INSERT INTO learning_words (user_id, language_id, word) VALUES (?, ?, ?)', [g.user.id, 1, word])
+        g.db.execute('INSERT INTO learning_words (user_id, language_id, word) VALUES (?, ?, ?)', [g.user.id, language_id, word])
 
     g.db.commit()
     return 'post succesful'
@@ -337,30 +387,40 @@ def build_stats_dict(word_counts, known_words):
     stats_dict['percent_known'] = 100*stats_dict['known_word_count']/stats_dict['word_count']
     return stats_dict
 
-def update_total_word_counts():
+def update_total_word_counts(user_id, language_id):
     """
     Runs the proper SQL statements to update the total_word_counts table.
     """
-    g.db.execute('DELETE FROM total_word_counts')
+    g.db.execute("""DELETE FROM total_word_counts
+                    WHERE user_id=?
+                    AND language_id=?""", [user_id, language_id])
     g.db.execute("""INSERT INTO total_word_counts
-                    SELECT word, SUM(word_count)
+                    SELECT user_id, language_id, word, SUM(word_count)
                     FROM text_word_counts
-                    GROUP BY word""")
+                    WHERE user_id=?
+                    AND language_id=?
+                    GROUP BY user_id, language_id, word""", [user_id, language_id])
     g.db.commit()
 
-def build_known_words_set():
+def build_known_words_set(user_id, language_id):
     """
     Builds a set composed of all the words in the known_words table.
     """
-    cur = g.db.execute('SELECT word FROM known_words')
+    cur = g.db.execute("""SELECT word
+                          FROM known_words
+                          WHERE user_id=?
+                          AND language_id=?""", [user_id, language_id])
     known_words = set(row[0] for row in cur.fetchall())
     return known_words
 
-def build_learning_words_set():
+def build_learning_words_set(user_id, language_id):
     """
     Builds a set composed of all the words in the learning_words table.
     """
-    cur = g.db.execute('SELECT word FROM learning_words')
+    cur = g.db.execute("""SELECT word 
+                          FROM learning_words
+                          WHERE user_id=?
+                          AND language_id=?""", [user_id, language_id])
     learning_words = set(row[0] for row in cur.fetchall())
     return learning_words
 

@@ -1,11 +1,11 @@
 {% extends "layout.html" %}
 {% block body %}
     <h1>Stats</h1>
-        <a href="{{ url_for('show_stats') }}">stats</a>
+        <a href="{{ url_for('show_language_stats', language_id=language_id) }}">stats</a>
     <h1>Known Words</h1>
-        <a href="{{ url_for('show_known_words') }}">known words</a>
+        <a href="{{ url_for('show_known_words', language_id=language_id) }}">known words</a>
     <h1>Learning Words</h1>
-        <a href="{{ url_for('show_learning_words') }}">learning words</a>
+        <a href="{{ url_for('show_learning_words', language_id=language_id) }}">learning words</a>
     <h1>Collections</h1>
     <ul>
     {% for collection in collections %}
@@ -13,7 +13,7 @@
     {% endfor %}
     </ul>
     <h1>Create New Collection</h1>
-    <form action="{{ url_for('create_collection') }}" method=post>
+    <form action="{{ url_for('create_collection', language_id=language_id) }}" method=post>
         <p>Collection Name</p>
         <input type=text name=name><br>
         <input type="submit">
