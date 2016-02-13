@@ -350,7 +350,7 @@ def update_word():
 @app.route('/translate', methods=['POST'])
 @login_required
 def translate():
-    return jsonify({'text': microsoft_translate(request.form['text'])})
+    return jsonify({'text': microsoft_translate(request.form['text'], request.form['languageID'])})
 
 def tokenize_text(text, known_words, learning_words):
     """
@@ -443,7 +443,10 @@ def build_collection_word_counts_dict(collection_id):
     word_counts = {row[0]: row[1] for row in cur.fetchall()}
     return word_counts
 
-def microsoft_translate(text):
+def microsoft_translate(text, language_id):
+    language_code_dict = {1: 'de', 2: 'es', 3: 'pt', 4: 'fr'}
+    language_code = language_code_dict[language_id]
+
     # get access token
     params = {
         'client_id': MS_TRANSLATOR_CLIENT_ID,
@@ -456,7 +459,7 @@ def microsoft_translate(text):
 
     # translate
     params = {'appId': 'Bearer ' + token,
-              'from': 'de',
+              'from': language_code,
               'to': 'en',
               'text': text}
     url = 'http://api.microsofttranslator.com/V2/Ajax.svc/Translate'

@@ -47,7 +47,8 @@ var main = function() {
         var translationContainer = popover.find('.translation-container');
         loader.show();
         $.post('/translate', {
-            text: word
+            text: word,
+            languageID: languageID
         }).done(function(translated) {
             loader.hide();
             var translatedWord = translated['text'];
