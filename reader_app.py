@@ -350,7 +350,7 @@ def update_word():
 @app.route('/translate', methods=['POST'])
 @login_required
 def translate():
-    return jsonify({'text': microsoft_translate(request.form['text'], request.form['languageID'])})
+    return jsonify({'text': microsoft_translate(request.form['text'], int(request.form['languageID']))})
 
 def tokenize_text(text, known_words, learning_words):
     """
