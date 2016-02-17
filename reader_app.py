@@ -141,7 +141,9 @@ def show_collection_stats(collection_id):
     return render_template('stats.html', top_overall_words=top_overall_words,
                                          top_unknown_words=top_unknown_words,
                                          top_learning_words=top_learning_words,
-                                         stats_dict=stats_dict)
+                                         stats_dict=stats_dict,
+                                         language_id=language_id,
+                                         collection_id=collection_id)
 
 @app.route('/languages/<int:language_id>/stats')
 @login_required
@@ -181,7 +183,8 @@ def show_language_stats(language_id):
     return render_template('stats.html', top_overall_words=top_overall_words,
                                          top_unknown_words=top_unknown_words,
                                          top_learning_words=top_learning_words,
-                                         stats_dict=stats_dict)
+                                         stats_dict=stats_dict,
+                                         language_id=language_id)
 
 @app.route('/known_words/<int:language_id>')
 @login_required
@@ -297,7 +300,7 @@ def delete_text(text_id):
     language_id = cur.fetchone()[0]
     g.db.execute('DELETE FROM texts WHERE id = ?', [text_id])
     g.db.execute('DELETE FROM text_word_counts WHERE text_id = ?', [text_id])
-    update_total_word_counts(g.db.user_id, language_id)
+    update_total_word_counts(g.user.id, language_id)
     g.db.commit()
     return redirect(url_for('index'))
 

@@ -10,13 +10,13 @@
     <h1>Top Learning Words</h1>
     <ol>
     {% for word, count in top_learning_words %}
-        <li>{{ word }}: {{ count }}</li>
+        <li><span class="learning">{{ word }}</span>: {{ count }}</li>
     {% endfor %}
     </ol>
     <h1>Top Unknown Words</h1>
     <ol>
     {% for word, count in top_unknown_words %}
-        <li>{{ word }}: {{ count }}</li>
+        <li><span class="unknown">{{ word }}</span>: {{ count }}</li>
     {% endfor %}
     </ol>
     <h1>Top Words Overall</h1>
@@ -25,4 +25,25 @@
         <li>{{ word }}: {{ count }}</li>
     {% endfor %}
     </ol>
+
+    {% if collection_id %}
+    <div id="popoverHiddenContent" style="display: none">
+        <button type="button" class="btn btn-primary btn-translate">Translate</button>
+        <img class="loading-gif" src="/static/loading.gif" style="display: none">
+        <p class="translation-container" style="display: none">put translation here</p>
+        <div class="btn-group word-class-buttons">
+          <button type="button" class="btn btn-default btn-known">Known</button>
+          <button type="button" class="btn btn-default btn-unknown">Unknown</button>
+          <button type="button" class="btn btn-default btn-learning">Learning</button>
+          <button type="button" class="btn btn-default btn-proper">Proper</button>
+        </div>
+    </div>
+
+    <p id="languageIDHiddenContent" style="display: none">{{ language_id }}</p>
+    <p id="collectionIDHiddenContent" style="display: none">{{ collection_id }}</p>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+    <script src="{{ url_for('static', filename='text_controller.js') }}"></script>
+    {% endif %}
 {% endblock %}
