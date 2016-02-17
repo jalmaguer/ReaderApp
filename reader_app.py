@@ -78,7 +78,6 @@ def index():
     """
     cur = g.db.execute('SELECT id, language FROM languages')
     languages = [dict(id=row[0], name=row[1]) for row in cur.fetchall()]
-    print(languages)
     return render_template('languages.html', languages=languages)
 
 @app.route('/languages/<int:language_id>')
@@ -121,9 +120,10 @@ def show_collection_stats(collection_id):
                           WHERE text_id IN (SELECT id FROM texts WHERE collection_id=?)
                           AND word NOT IN (SELECT word FROM known_words)
                           AND word NOT IN (SELECT word FROM learning_words)
+                          AND word NOT IN (SELECT word FROM proper_nouns WHERE collection_id=?)
                           GROUP BY word
                           ORDER BY SUM(word_count) DESC, word ASC
-                          LIMIT 100""", [collection_id])
+                          LIMIT 100""", [collection_id, collection_id])
     top_unknown_words = [(row[0], row[1]) for row in cur.fetchall()]
     cur = g.db.execute("""SELECT word, SUM(word_count) FROM text_word_counts
                           WHERE text_id IN (SELECT id FROM texts WHERE collection_id=?)
@@ -258,17 +258,19 @@ def show_text(text_id):
     words that appear more than once in the text, and create a dictionary of statistics about the text.
     """
     #TODO: need to fix this so that users can't go to each others texts by simply inputting the correct URL
-    cur = g.db.execute('SELECT title, text, language_id FROM texts WHERE id=?', [text_id])
+    cur = g.db.execute('SELECT title, text, language_id, collection_id FROM texts WHERE id=?', [text_id])
     row = cur.fetchone()
     title = row[0]
     text = row[1]
     language_id = row[2]
+    collection_id = row[3]
     known_words = build_known_words_set(g.user.id, language_id)
     learning_words = build_learning_words_set(g.user.id, language_id)
-    known_or_learning_words = known_words.union(learning_words)
-    token_tuple_lines = tokenize_text(text, known_words, learning_words)
+    proper_nouns = build_proper_nouns_set(g.user.id, collection_id)
+    word_union_set = known_words.union(learning_words).union(proper_nouns)
+    token_tuple_lines = tokenize_text(text, known_words, learning_words, proper_nouns)
     word_counts = build_text_word_counts_dict(text_id)
-    top_unknown_words = [(count, word) for word, count in word_counts.items() if count > 1 and word not in known_or_learning_words]
+    top_unknown_words = [(count, word) for word, count in word_counts.items() if count > 1 and word not in word_union_set]
     top_unknown_words.sort(reverse=True)
     top_learning_words = [(count, word) for word, count in word_counts.items() if count > 1 and word in learning_words]
     top_learning_words.sort(reverse=True)
@@ -277,6 +279,7 @@ def show_text(text_id):
                             text_id=text_id,
                             title=title,
                             language_id=language_id,
+                            collection_id=collection_id,
                             token_tuple_lines=token_tuple_lines,
                             top_unknown_words=top_unknown_words,
                             top_learning_words=top_learning_words,
@@ -327,6 +330,7 @@ def update_word():
     removeFrom = postObject['removeFrom']
     addTo = postObject['addTo']
     language_id = postObject['languageID']
+    collection_id = postObject['collectionID']
 
     if removeFrom == 'known':
         g.db.execute("""DELETE FROM known_words
@@ -338,11 +342,18 @@ def update_word():
                         WHERE user_id = ?
                         AND language_id = ?
                         AND word = ?""", [g.user.id, language_id, word])
+    elif removeFrom == 'proper':
+        g.db.execute("""DELETE FROM proper_nouns
+                        WHERE user_id = ?
+                        AND collection_id = ?
+                        AND word = ?""", [g.user.id, collection_id, word])
 
     if addTo == 'known':
         g.db.execute('INSERT INTO known_words (user_id, language_id, word) VALUES (?, ?, ?)', [g.user.id, language_id, word])
     elif addTo == 'learning':
         g.db.execute('INSERT INTO learning_words (user_id, language_id, word) VALUES (?, ?, ?)', [g.user.id, language_id, word])
+    elif addTo == 'proper':
+        g.db.execute('INSERT INTO proper_nouns (user_id, collection_id, word) VALUES (?, ?, ?)', [g.user.id, collection_id, word])
 
     g.db.commit()
     return 'post succesful'
@@ -352,7 +363,7 @@ def update_word():
 def translate():
     return jsonify({'text': microsoft_translate(request.form['text'], int(request.form['languageID']))})
 
-def tokenize_text(text, known_words, learning_words):
+def tokenize_text(text, known_words, learning_words, proper_nouns):
     """
     Breaks up text into a list of lines where each lines is a list of tuples containing a token
     and whether it is known, unknown, or a non-word.  Takes a text as a string and a set of
@@ -368,6 +379,8 @@ def tokenize_text(text, known_words, learning_words):
                 token_tuples.append((token, 'known'))
             elif token.lower() in learning_words:
                 token_tuples.append((token, 'learning'))
+            elif token.lower() in proper_nouns:
+                token_tuples.append((token, 'proper'))
             elif token.isalpha():
                 token_tuples.append((token, 'unknown'))
             else:
@@ -423,6 +436,18 @@ def build_learning_words_set(user_id, language_id):
                           AND language_id=?""", [user_id, language_id])
     learning_words = set(row[0] for row in cur.fetchall())
     return learning_words
+
+def build_proper_nouns_set(user_id, collection_id):
+    """
+    Builds a set composer of all the proper nouns in a collection.
+    """
+    cur = g.db.execute("""SELECT word 
+                          FROM proper_nouns
+                          WHERE user_id=?
+                          AND collection_id=?""", [user_id, collection_id])
+    proper_nouns = set(row[0] for row in cur.fetchall())
+    return proper_nouns
+
 
 def build_text_word_counts_dict(text_id):
     """

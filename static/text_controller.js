@@ -12,6 +12,7 @@ var postToDatabase = function(postObject) {
 
 var main = function() {
     var languageID = parseInt($('#languageIDHiddenContent').text());
+    var collectionID = parseInt($('#collectionIDHiddenContent').text());
 
     //TODO: only allow one popover to be open at a time
     $('span').click(function() {
@@ -24,6 +25,8 @@ var main = function() {
             wordClass = 'unknown';
         } else if (e.hasClass('learning')) {
             wordClass = 'learning';
+        } else if (e.hasClass('proper')) {
+            wordClass = 'proper';
         }
         var popOverHiddenContent = $('#popoverHiddenContent');
         popOverHiddenContent.find('button').removeClass('active');
@@ -67,7 +70,7 @@ var main = function() {
         $(this).addClass('active');
         var elementArray = $('span').filter(function() { return ($(this).text().toLowerCase() === word) });
         elementArray.removeClass(oldWordClass).addClass(newWordClass);
-        var postObject = {word:word, removeFrom:oldWordClass, addTo:newWordClass, languageID:languageID};
+        var postObject = {word:word, removeFrom:oldWordClass, addTo:newWordClass, languageID:languageID, collectionID:collectionID};
         postToDatabase(postObject);
     });
 

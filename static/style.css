@@ -14,6 +14,10 @@ body {
     color: orange;
 }
 
+.proper {
+    color: blue;
+}
+
 .btn-known {
   background-color: white;
   color: green;
@@ -56,5 +60,20 @@ body {
 .btn-unknown.active:hover,
 .btn-unknown.active:focus {
   background-color: orange;
+  color: white;
+}
+
+.btn-proper {
+  background-color: white;
+  color: blue;
+}
+
+.btn-proper:hover,
+.btn-proper:focus,
+.btn-proper:active,
+.btn-proper.active,
+.btn-proper.active:hover,
+.btn-proper.active:focus {
+  background-color: blue;
   color: white;
 }
