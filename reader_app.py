@@ -277,7 +277,7 @@ def show_text(text_id):
     top_unknown_words.sort(reverse=True)
     top_learning_words = [(count, word) for word, count in word_counts.items() if count > 1 and word in learning_words]
     top_learning_words.sort(reverse=True)
-    stats_dict = build_stats_dict(word_counts, known_words)
+    stats_dict = build_stats_dict(word_counts, known_words.union(proper_nouns))
     return render_template('text.html', 
                             text_id=text_id,
                             title=title,
