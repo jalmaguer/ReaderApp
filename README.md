@@ -1,0 +1,3 @@
+# ReaderApp
+
+Language learning web app for people interested in progressing from an intermediate to an advanced level in a foreign language.  Allows you to upload texts and the app will automatically highlight words you know well, words you are learning, and words you don't know.  By simply clicking on words you can change words from one category to the other.  It also keeps track of stats about all of the texts such as what are the most frequent words you don't know or what percent of the words in a text you already know which allows you to gauge how difficult a text will be before beginning to read it.  It also integrates with the Microsoft translate API to translate specific words when you click translate.
