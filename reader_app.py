@@ -1,10 +1,11 @@
 import sqlite3
 from flask import Flask, render_template, request, g, url_for, redirect, jsonify
-from flask.ext.login import UserMixin, login_required, login_user, logout_user, LoginManager, current_user
+from flask_login import UserMixin, login_required, login_user, logout_user, LoginManager, current_user
 from config import MS_TRANSLATOR_CLIENT_ID, MS_TRANSLATOR_CLIENT_SECRET
 import re
 from collections import defaultdict
 import requests
+from newspaper import Article
 
 #create our application
 app = Flask(__name__)
@@ -365,6 +366,20 @@ def update_word():
 @login_required
 def translate():
     return jsonify({'text': microsoft_translate(request.form['text'], int(request.form['languageID']))})
+
+@app.route('/collections/<int:collection_id>/preview_article', methods=['POST'])
+@login_required
+def preview_article(collection_id):
+    if request.method == 'POST':
+        url = request.form['url']
+        article = Article(url)
+        print('downloading article')
+        article.download()
+        article.parse()
+        return render_template('preview_article.html',
+                               collection_id=collection_id,
+                               title=article.title,
+                               text=article.text)
 
 def tokenize_text(text, known_words, learning_words, proper_nouns):
     """
