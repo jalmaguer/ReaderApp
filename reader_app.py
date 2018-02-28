@@ -241,6 +241,18 @@ def upload_text(collection_id):
         g.db.commit()
     return redirect(url_for('show_collection', collection_id=collection_id))
 
+@app.route('/add_language', methods=['POST'])
+@login_required
+def add_language():
+    """
+    Add new language
+    """
+    if request.method == 'POST':
+        language = request.form['language']
+        cur = g.db.execute('INSERT INTO languages (language) VALUES (?)', [language])
+        g.db.commit()
+    return redirect(url_for('index'))
+
 @app.route('/languages/<int:language_id>/create_collection', methods=['POST'])
 @login_required
 def create_collection(language_id):
