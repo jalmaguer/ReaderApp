@@ -24,13 +24,13 @@ CREATE TABLE learning_words (
     PRIMARY KEY (user_id, language_id, word)
 );
 
+DROP TABLE IF EXISTS proper_nouns;
 CREATE TABLE proper_nouns (
     user_id INTEGER NOT NULL,
     collection_id INTEGER NOT NULL,
     word TEXT NOT NULL,
     PRIMARY KEY (user_id, collection_id, word)
 );
-
 
 DROP TABLE IF EXISTS text_word_counts;
 CREATE TABLE text_word_counts (
@@ -69,3 +69,6 @@ CREATE TABLE languages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     language TEXT NOT NULL
 );
+
+INSERT INTO users (username, password)
+VALUES ('admin', 'admin');
