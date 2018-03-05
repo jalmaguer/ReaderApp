@@ -1,6 +1,8 @@
 import sqlite3
 from flask import Flask, render_template, request, g, url_for, redirect, jsonify
 from flask_login import UserMixin, login_required, login_user, logout_user, LoginManager, current_user
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
 from config import MS_TRANSLATOR_CLIENT_ID, MS_TRANSLATOR_CLIENT_SECRET
 import re
 from collections import defaultdict
@@ -10,12 +12,106 @@ from newspaper import Article
 #create our application
 app = Flask(__name__)
 app.config.from_object('config')
+db = SQLAlchemy(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-class User(UserMixin):
-    pass
+class Text(db.Model):
+    __tablename__ = 'texts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    language_id = db.Column(db.Integer, nullable=False)
+    collection_id = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String, nullable=False)
+    text = db.Column(db.String, nullable=False)
+
+    def __repr__(self):
+        return '<Text %r>' % self.title
+
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String, nullable=False)
+    password = db.Column(db.String, nullable=False)
+
+    def __repr__(self):
+        return '<User %r>' % self.username
+
+class KnownWord(db.Model):
+    __tablename__ = 'known_words'
+
+    user_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    language_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    word = db.Column(db.String, primary_key=True, nullable=False)
+
+    def __repr__(self):
+        return '<KnownWord %r>' % self.word
+
+class LearningWord(db.Model):
+    __tablename__ = 'learning_words'
+
+    user_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    language_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    word = db.Column(db.String, primary_key=True, nullable=False)
+
+    def __repr__(self):
+        return '<LearningWord %r>' % self.word
+
+class ProperNoun(db.Model):
+    __tablename__ = 'proper_nouns'
+
+    user_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    collection_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    word = db.Column(db.String, primary_key=True, nullable=False)
+
+    def __repr__(self):
+        return '<ProperNoun %r>' % self.word
+
+class TextWordCount(db.Model):
+    __tablename__ = 'text_word_counts'
+
+    user_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    language_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    text_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    word = db.Column(db.String, primary_key=True, nullable=False)
+    word_count = db.Column(db.Integer, nullable=False)
+
+    def __repr__(self):
+        return '<TextWordCount %r>' % self.word
+
+class TotalWordCount(db.Model):
+    __tablename__ = 'total_word_counts'
+
+    user_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    language_id = db.Column(db.Integer, primary_key=True, nullable=False)
+    word = db.Column(db.String, primary_key=True, nullable=False)
+    word_count = db.Column(db.Integer, nullable=False)
+
+    def __repr__(self):
+        return '<TotalWordCount %r>' % self.word
+
+class Language(db.Model):
+    __tablename__ = 'languages'
+
+    id = db.Column(db.Integer, primary_key=True)
+    language = db.Column(db.String, nullable=False)
+
+    def __repr__(self):
+        return '<Language %r>' % self.language
+
+class Collection(db.Model):
+    __tablename__ = 'collections'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    language_id = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.String, nullable=False)
+
+    def __repr__(self):
+        return '<Collection %r>' % self.name
 
 @login_manager.user_loader
 def user_loader(user_id):
@@ -77,8 +173,7 @@ def index():
     """
     Show a list of languages that collections can be created for.
     """
-    cur = g.db.execute('SELECT id, language FROM languages')
-    languages = [dict(id=row[0], name=row[1]) for row in cur.fetchall()]
+    languages = Language.query.all()
     return render_template('languages.html', languages=languages)
 
 @app.route('/languages/<int:language_id>')
@@ -87,11 +182,7 @@ def show_language_collections(language_id):
     """
     Show a list of the collections of the text for a particular language.
     """
-    cur = g.db.execute("""SELECT id, name
-                          FROM collections
-                          WHERE user_id=?
-                          AND language_id=?""", [g.user.id, language_id])
-    collections = [dict(collection_id=row[0], name=row[1]) for row in cur.fetchall()]
+    collections = Collection.query.filter_by(user_id=g.user.id, language_id=language_id).all()
     return render_template('index.html', collections=collections, language_id=language_id)
 
 @app.route('/collections/<int:collection_id>')
@@ -100,8 +191,7 @@ def show_collection(collection_id):
     """
     Show a list of text titles in the collection with links to full text.
     """
-    cur = g.db.execute('SELECT id, title FROM texts WHERE collection_id=?', [collection_id])
-    texts = [dict(text_id=row[0], title=row[1]) for row in cur.fetchall()]
+    texts = Text.query.filter_by(collection_id=collection_id).all()
     return render_template('collection.html', texts=texts, collection_id=collection_id)
 
 @app.route('/collections/<int:collection_id>/stats')
@@ -111,31 +201,36 @@ def show_collection_stats(collection_id):
     Show the top 100 unknown words, words overall, and learning words in all texts
     in a collection along with the word counts.
     """
-    cur = g.db.execute("""SELECT word, SUM(word_count) FROM text_word_counts
-                          WHERE text_id IN (SELECT id FROM texts WHERE collection_id=?)
-                          GROUP BY word
-                          ORDER BY SUM(word_count) DESC, word ASC
-                          LIMIT 100""", [collection_id])
-    top_overall_words = [(row[0], row[1]) for row in cur.fetchall()]
-    cur = g.db.execute("""SELECT word, SUM(word_count) FROM text_word_counts
-                          WHERE text_id IN (SELECT id FROM texts WHERE collection_id=?)
-                          AND word NOT IN (SELECT word FROM known_words)
-                          AND word NOT IN (SELECT word FROM learning_words)
-                          AND word NOT IN (SELECT word FROM proper_nouns WHERE collection_id=?)
-                          GROUP BY word
-                          ORDER BY SUM(word_count) DESC, word ASC
-                          LIMIT 100""", [collection_id, collection_id])
-    top_unknown_words = [(row[0], row[1]) for row in cur.fetchall()]
-    cur = g.db.execute("""SELECT word, SUM(word_count) FROM text_word_counts
-                          WHERE text_id IN (SELECT id FROM texts WHERE collection_id=?)
-                          AND word IN (SELECT word FROM learning_words)
-                          GROUP BY word
-                          ORDER BY SUM(word_count) DESC, word ASC
-                          LIMIT 100""", [collection_id])
-    top_learning_words = [(row[0], row[1]) for row in cur.fetchall()]
-    cur = g.db.execute('SELECT language_id FROM collections WHERE id = ?', [collection_id])
-    row = cur.fetchone()
-    language_id = row[0]
+    collection_text_ids = db.session.query(Text.id).filter_by(collection_id=collection_id)
+    known_words = db.session.query(KnownWord.word)
+    learning_words = db.session.query(LearningWord.word)
+    proper_nouns = db.session.query(ProperNoun.word).filter_by(collection_id=collection_id)
+    top_overall_words = (db.session
+                           .query(TextWordCount.word, func.sum(TextWordCount.word_count))
+                           .filter(TextWordCount.text_id.in_(collection_text_ids))
+                           .group_by(TextWordCount.word)
+                           .order_by(func.sum(TextWordCount.word_count).desc(), TextWordCount.word)
+                           .limit(100)
+                           .all())
+    top_unknown_words = (db.session
+                            .query(TextWordCount.word, func.sum(TextWordCount.word_count))
+                            .filter(TextWordCount.text_id.in_(collection_text_ids))
+                            .filter(~TextWordCount.word.in_(known_words))
+                            .filter(~TextWordCount.word.in_(learning_words))
+                            .filter(~TextWordCount.word.in_(proper_nouns))
+                            .group_by(TextWordCount.word)
+                            .order_by(func.sum(TextWordCount.word_count).desc(), TextWordCount.word)
+                            .limit(100)
+                            .all())
+    top_learning_words = (db.session
+                            .query(TextWordCount.word, func.sum(TextWordCount.word_count))
+                            .filter(TextWordCount.text_id.in_(collection_text_ids))
+                            .filter(TextWordCount.word.in_(learning_words))
+                            .group_by(TextWordCount.word)
+                            .order_by(func.sum(TextWordCount.word_count).desc(), TextWordCount.word)
+                            .limit(100)
+                            .all())
+    language_id = db.session.query(Collection.language_id).filter_by(id=collection_id).scalar()
     word_counts = build_collection_word_counts_dict(collection_id)
     known_words = build_known_words_set(g.user.id, language_id)
     stats_dict = build_stats_dict(word_counts, known_words)
@@ -153,34 +248,33 @@ def show_language_stats(language_id):
     Show the top 100 unknown words, words overall, and learning words in all texts
     along with the counts.
     """
-    cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
-                          WHERE user_id=?
-                          AND language_id=?
-                          ORDER BY word_count DESC, word ASC
-                          LIMIT 100""", [g.user.id, language_id])
-    top_overall_words = [(row[0], row[1]) for row in cur.fetchall()]
-    cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
-                          WHERE word NOT IN (SELECT word FROM known_words)
-                          AND word NOT IN (SELECT word FROM learning_words)
-                          AND user_id=?
-                          AND language_id=?
-                          ORDER BY word_count DESC, word ASC
-                          LIMIT 100""", [g.user.id, language_id])
-    top_unknown_words = [(row[0], row[1]) for row in cur.fetchall()]
-    cur = g.db.execute("""SELECT word, word_count FROM total_word_counts
-                          WHERE word IN (SELECT word FROM learning_words)
-                          AND user_id=?
-                          AND language_id=?
-                          ORDER BY word_count DESC, word ASC
-                          LIMIT 100""", [g.user.id, language_id])
-    top_learning_words = [(row[0], row[1]) for row in cur.fetchall()]
-    cur = g.db.execute("""SELECT word, word_count 
-                          FROM total_word_counts
-                          WHERE user_id=?
-                          AND language_id=?""", [g.user.id, language_id])
-    word_counts = {row[0]: row[1] for row in cur.fetchall()}
+    known_words = db.session.query(KnownWord.word)
+    learning_words = db.session.query(LearningWord.word)
+    top_overall_words = (db.session
+                           .query(TotalWordCount.word, TotalWordCount.word_count)
+                           .filter_by(user_id=g.user.id, language_id=language_id)
+                           .order_by(TotalWordCount.word_count.desc(), TotalWordCount.word)
+                           .limit(100)
+                           .all())
+    top_unknown_words = (db.session
+                           .query(TotalWordCount.word, TotalWordCount.word_count)
+                           .filter(~TotalWordCount.word.in_(known_words))
+                           .filter(~TotalWordCount.word.in_(learning_words))
+                           .filter_by(user_id=g.user.id, language_id=language_id)
+                           .order_by(TotalWordCount.word_count.desc(), TotalWordCount.word)
+                           .limit(100)
+                           .all())
+    top_learning_words = (db.session
+                            .query(TotalWordCount.word, TotalWordCount.word_count)
+                            .filter(TotalWordCount.word.in_(learning_words))
+                            .filter_by(user_id=g.user.id, language_id=language_id)
+                            .order_by(TotalWordCount.word_count.desc(), TotalWordCount.word)
+                            .limit(100)
+                            .all())
+    word_counts = TotalWordCount.query.filter_by(user_id=g.user.id, language_id=language_id)
+    word_counts_dict = {row.word: row.word_count for row in word_counts}
     known_words = build_known_words_set(g.user.id, language_id)
-    stats_dict = build_stats_dict(word_counts, known_words)
+    stats_dict = build_stats_dict(word_counts_dict, known_words)
     return render_template('stats.html', top_overall_words=top_overall_words,
                                          top_unknown_words=top_unknown_words,
                                          top_learning_words=top_learning_words,

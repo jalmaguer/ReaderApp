@@ -9,7 +9,7 @@
     <h1>Collections</h1>
     <ul>
     {% for collection in collections %}
-        <li><h2><a href="{{ url_for('show_collection', collection_id=collection.collection_id) }}">{{ collection.name }}</a></h2>
+        <li><h2><a href="{{ url_for('show_collection', collection_id=collection.id) }}">{{ collection.name }}</a></h2>
     {% endfor %}
     </ul>
     <h1>Create New Collection</h1>

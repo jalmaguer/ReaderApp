@@ -4,7 +4,7 @@
     <h1>Languages</h1>
     <ul>
     {% for language in languages %}
-        <li><h2><a href="{{ url_for('show_language_collections', language_id=language.id) }}">{{ language.name }}</a></h2>
+        <li><h2><a href="{{ url_for('show_language_collections', language_id=language.id) }}">{{ language.language }}</a></h2>
     {% endfor %}
     </ul>
     <h1>Add New Language</h1>

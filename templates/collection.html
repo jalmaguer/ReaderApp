@@ -5,7 +5,7 @@
     <h1>Texts</h1>
     <ul>
     {% for text in texts %}
-        <li><h2><a href="{{ url_for('show_text', text_id=text.text_id) }}">{{ text.title }}</a></h2>
+        <li><h2><a href="{{ url_for('show_text', text_id=text.id) }}">{{ text.title }}</a></h2>
     {% endfor %}
     </ul>
     <h1>Paste in a Text</h1>
