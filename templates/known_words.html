@@ -2,8 +2,8 @@
 {% block body %}
     <h1>Known Words</h1>
     <ol>
-    {% for word in words %}
-        <li>{{ word }}</li>
+    {% for row in rows %}
+        <li>{{ row.word }}</li>
     {% endfor %}
     </ol>
 {% endblock %}

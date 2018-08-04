@@ -287,12 +287,11 @@ def show_known_words(language_id):
     """
     Show a list of all the known words.
     """
-    cur = g.db.execute("""SELECT word
-                          FROM known_words
-                          WHERE user_id=?
-                          AND language_id=?""", [g.user.id, language_id])
-    words = [row[0] for row in cur.fetchall()]
-    return render_template('known_words.html', words=words)
+    rows = (db.session
+               .query(KnownWord.word)
+               .filter_by(user_id=g.user.id, language_id=language_id)
+               .all())
+    return render_template('known_words.html', rows=rows)
 
 @app.route('/learning_words/<int:language_id>')
 @login_required
@@ -300,12 +299,11 @@ def show_learning_words(language_id):
     """
     Show a list of all the words being learned.
     """
-    cur = g.db.execute("""SELECT word
-                          FROM learning_words
-                          WHERE user_id=?
-                          AND language_id=?""", [g.user.id, language_id])
-    words = [row[0] for row in cur.fetchall()]
-    return render_template('learning_words.html', words=words)
+    rows = (db.session
+               .query(LearningWord.word)
+               .filter_by(user_id=g.user.id, language_id=language_id)
+               .all())
+    return render_template('learning_words.html', rows=rows)
 
 @app.route('/collections/<int:collection_id>/upload_text', methods=['POST'])
 @login_required
@@ -368,17 +366,15 @@ def show_text(text_id):
     words that appear more than once in the text, and create a dictionary of statistics about the text.
     """
     #TODO: need to fix this so that users can't go to each others texts by simply inputting the correct URL
-    cur = g.db.execute('SELECT title, text, language_id, collection_id FROM texts WHERE id=?', [text_id])
-    row = cur.fetchone()
-    title = row[0]
-    text = row[1]
-    language_id = row[2]
-    collection_id = row[3]
-    known_words = build_known_words_set(g.user.id, language_id)
-    learning_words = build_learning_words_set(g.user.id, language_id)
-    proper_nouns = build_proper_nouns_set(g.user.id, collection_id)
+    text = (db.session
+                .query(Text)
+                .filter_by(id=text_id)
+                .one())
+    known_words = build_known_words_set(g.user.id, text.language_id)
+    learning_words = build_learning_words_set(g.user.id, text.language_id)
+    proper_nouns = build_proper_nouns_set(g.user.id, text.collection_id)
     word_union_set = known_words.union(learning_words).union(proper_nouns)
-    token_tuple_lines = tokenize_text(text, known_words, learning_words, proper_nouns)
+    token_tuple_lines = tokenize_text(text.text, known_words, learning_words, proper_nouns)
     word_counts = build_text_word_counts_dict(text_id)
     top_unknown_words = [(count, word) for word, count in word_counts.items() if count > 1 and word not in word_union_set]
     top_unknown_words.sort(reverse=True)
@@ -387,9 +383,9 @@ def show_text(text_id):
     stats_dict = build_stats_dict(word_counts, known_words.union(proper_nouns))
     return render_template('text.html', 
                             text_id=text_id,
-                            title=title,
-                            language_id=language_id,
-                            collection_id=collection_id,
+                            title=text.title,
+                            language_id=text.language_id,
+                            collection_id=text.collection_id,
                             token_tuple_lines=token_tuple_lines,
                             top_unknown_words=top_unknown_words,
                             top_learning_words=top_learning_words,
@@ -543,33 +539,33 @@ def build_known_words_set(user_id, language_id):
     """
     Builds a set composed of all the words in the known_words table.
     """
-    cur = g.db.execute("""SELECT word
-                          FROM known_words
-                          WHERE user_id=?
-                          AND language_id=?""", [user_id, language_id])
-    known_words = set(row[0] for row in cur.fetchall())
+    query_result = (db.session
+                        .query(KnownWord.word)
+                        .filter_by(user_id=user_id, language_id=language_id)
+                        .all())
+    known_words = set(row.word for row in query_result)
     return known_words
 
 def build_learning_words_set(user_id, language_id):
     """
     Builds a set composed of all the words in the learning_words table.
     """
-    cur = g.db.execute("""SELECT word 
-                          FROM learning_words
-                          WHERE user_id=?
-                          AND language_id=?""", [user_id, language_id])
-    learning_words = set(row[0] for row in cur.fetchall())
+    query_result = (db.session
+                        .query(LearningWord.word)
+                        .filter_by(user_id=user_id, language_id=language_id)
+                        .all())
+    learning_words = set(row.word for row in query_result)
     return learning_words
 
 def build_proper_nouns_set(user_id, collection_id):
     """
     Builds a set composer of all the proper nouns in a collection.
     """
-    cur = g.db.execute("""SELECT word 
-                          FROM proper_nouns
-                          WHERE user_id=?
-                          AND collection_id=?""", [user_id, collection_id])
-    proper_nouns = set(row[0] for row in cur.fetchall())
+    query_result = (db.session
+                        .query(ProperNoun.word)
+                        .filter_by(user_id=user_id, collection_id=collection_id)
+                        .all())
+    proper_nouns = set(row.word for row in query_result)
     return proper_nouns
 
 
@@ -577,22 +573,28 @@ def build_text_word_counts_dict(text_id):
     """
     Builds a dictionary of word counts in a particular text.
     """
-    cur = g.db.execute('SELECT word, word_count FROM text_word_counts WHERE text_id = ?', [text_id])
-    word_counts = {row[0]: row[1] for row in cur.fetchall()}
+    query_result = (db.session
+                        .query(TextWordCount.word, TextWordCount.word_count)
+                        .filter_by(text_id=text_id)
+                        .all())
+    word_counts = {row.word: row.word_count for row in query_result}
     return word_counts
 
 def build_collection_word_counts_dict(collection_id):
     """
     Build a dictionary of word counts in a collection
     """
-    cur = g.db.execute("""SELECT word, SUM(word_count)
-                          FROM text_word_counts
-                          WHERE text_id IN (SELECT id FROM texts WHERE collection_id=?)
-                          GROUP BY word""", [collection_id])
-    word_counts = {row[0]: row[1] for row in cur.fetchall()}
+    collection_text_ids = db.session.query(Text.id).filter_by(collection_id=collection_id)
+    query_result = (db.session
+                        .query(TextWordCount.word, func.sum(TextWordCount.word_count))
+                        .filter(TextWordCount.text_id.in_(collection_text_ids))
+                        .group_by(TextWordCount.word)
+                        .all())
+    word_counts = {row[0]: row[1] for row in query_result}
     return word_counts
 
 def microsoft_translate(text, language_id):
+    #TODO: find different service this doesn't work anymore
     language_code_dict = {1: 'de', 2: 'es', 3: 'pt', 4: 'fr'}
     language_code = language_code_dict[language_id]
 
