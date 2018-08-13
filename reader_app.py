@@ -2,7 +2,7 @@ import sqlite3
 from flask import Flask, render_template, request, g, url_for, redirect, jsonify
 from flask_login import UserMixin, login_required, login_user, logout_user, LoginManager, current_user
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func
+from sqlalchemy import func, insert
 from config import MS_TRANSLATOR_CLIENT_ID, MS_TRANSLATOR_CLIENT_SECRET
 import re
 from collections import defaultdict
@@ -315,22 +315,27 @@ def upload_text(collection_id):
     if request.method == 'POST':
         title = request.form['title']
         text = request.form['text']
-        cur = g.db.execute('SELECT language_id FROM collections WHERE id = ?', [collection_id])
-        row = cur.fetchone()
-        language_id = row[0]
-        cur = g.db.execute("""INSERT INTO texts (user_id, language_id, collection_id, title, text) 
-                              VALUES (?, ?, ?, ?, ?)""", [g.user.id, language_id, collection_id, title, text])
-        text_id = cur.lastrowid
+        language_id = db.session.query(Collection.language_id).filter_by(id=collection_id).scalar()
+        new_text = Text(user_id=g.user.id, language_id=language_id, collection_id=collection_id, title=title, text=text)
+        db.session.add(new_text)
+        db.session.flush()
+
+        text_id = new_text.id
         tokens = re.split('(\w*)', text)
         words = [token.lower() for token in tokens if token.isalpha()]
         word_counts = defaultdict(int)
         for word in words:
             word_counts[word] += 1
-        word_count_tuples = [(g.user.id, language_id, text_id, key, value) for key, value in word_counts.items()]
-        g.db.executemany("""INSERT INTO text_word_counts (user_id, language_id, text_id, word, word_count)
-                            VALUES (?, ?, ?, ?, ?)""", word_count_tuples)
+        text_word_counts = [TextWordCount(user_id=g.user.id,
+                                          language_id=language_id,
+                                          text_id=text_id,
+                                          word=key,
+                                          word_count=value)
+                            for key, value in word_counts.items()]
+        db.session.add_all(text_word_counts)
         update_total_word_counts(g.user.id, language_id)
-        g.db.commit()
+        # g.db.commit()
+        db.session.commit()
     return redirect(url_for('show_collection', collection_id=collection_id))
 
 @app.route('/add_language', methods=['POST'])
@@ -341,8 +346,9 @@ def add_language():
     """
     if request.method == 'POST':
         language = request.form['language']
-        cur = g.db.execute('INSERT INTO languages (language) VALUES (?)', [language])
-        g.db.commit()
+        new_language = Language(language=language)
+        db.session.add(new_language)
+        db.session.commit()
     return redirect(url_for('index'))
 
 @app.route('/languages/<int:language_id>/create_collection', methods=['POST'])
@@ -353,8 +359,9 @@ def create_collection(language_id):
     """
     if request.method == 'POST':
         name = request.form['name']
-        cur = g.db.execute('INSERT INTO collections (user_id, language_id, name) VALUES (?, ?, ?)', [g.user.id, language_id, name])
-        g.db.commit()
+        new_collection = Collection(user_id=g.user.id, language_id=language_id, name=name)
+        db.session.add(new_collection)
+        db.session.commit()
     return redirect(url_for('index'))
 
 @app.route('/texts/<int:text_id>')
@@ -399,12 +406,11 @@ def delete_text(text_id):
     table, and update the total_word_counts table.
     """
     #TODO: only allow users to delete their own texts
-    cur = g.db.execute('SELECT language_id FROM texts WHERE id = ?', [text_id])
-    language_id = cur.fetchone()[0]
-    g.db.execute('DELETE FROM texts WHERE id = ?', [text_id])
-    g.db.execute('DELETE FROM text_word_counts WHERE text_id = ?', [text_id])
+    language_id = db.session.query(Text.language_id).filter_by(id=text_id).scalar()
+    db.session.query(Text).filter_by(id=text_id).delete()
+    db.session.query(TextWordCount).filter_by(text_id=text_id).delete()
     update_total_word_counts(g.user.id, language_id)
-    g.db.commit()
+    db.session.commit()
     return redirect(url_for('index'))
 
 @app.route('/delete_collection/<int:collection_id>', methods=['POST'])
@@ -413,11 +419,10 @@ def delete_collection(collection_id):
     """
     Delete collection from collections table.  Will only allow a collection to be deleted if it is empty.
     """
-    cur = g.db.execute('SELECT COUNT(*) FROM texts WHERE collection_id=?', [collection_id])
-    texts_in_collection = cur.fetchone()[0]
+    texts_in_collection = db.session.query(Text).filter_by(collection_id=collection_id).count()
     if texts_in_collection == 0:
-        g.db.execute('DELETE FROM collections WHERE id=?', [collection_id])
-        g.db.commit()
+        db.session.query(Collection).filter_by(id=collection_id).delete()
+        db.session.commit()
         return redirect(url_for('index'))
     else:
         print('Can not delete collection that is not empty')
@@ -439,29 +444,23 @@ def update_word():
     collection_id = postObject['collectionID']
 
     if removeFrom == 'known':
-        g.db.execute("""DELETE FROM known_words
-                        WHERE user_id = ?
-                        AND language_id = ?
-                        AND word = ?""", [g.user.id, language_id, word])
+        db.session.query(KnownWord).filter_by(user_id=g.user.id, language_id=language_id, word=word).delete()
     elif removeFrom == 'learning':
-        g.db.execute("""DELETE FROM learning_words
-                        WHERE user_id = ?
-                        AND language_id = ?
-                        AND word = ?""", [g.user.id, language_id, word])
+        db.session.query(LearningWord).filter_by(user_id=g.user.id, language_id=language_id, word=word).delete()
     elif removeFrom == 'proper':
-        g.db.execute("""DELETE FROM proper_nouns
-                        WHERE user_id = ?
-                        AND collection_id = ?
-                        AND word = ?""", [g.user.id, collection_id, word])
+        db.session.query(ProperNoun).filter_by(user_id=g.user.id, collection_id=collection_id, word=word).delete()
 
     if addTo == 'known':
-        g.db.execute('INSERT INTO known_words (user_id, language_id, word) VALUES (?, ?, ?)', [g.user.id, language_id, word])
+        known_word = KnownWord(user_id=g.user.id, language_id=language_id, word=word)
+        db.session.add(known_word)
     elif addTo == 'learning':
-        g.db.execute('INSERT INTO learning_words (user_id, language_id, word) VALUES (?, ?, ?)', [g.user.id, language_id, word])
+        learning_word = LearningWord(user_id=g.user.id, language_id=language_id, word=word)
+        db.session.add(learning_word)
     elif addTo == 'proper':
-        g.db.execute('INSERT INTO proper_nouns (user_id, collection_id, word) VALUES (?, ?, ?)', [g.user.id, collection_id, word])
+        proper_noun = ProperNoun(user_id=g.user.id, collection_id=collection_id, word=word)
+        db.session.add(proper_noun)
 
-    g.db.commit()
+    db.session.commit()
     return 'post succesful'
 
 @app.route('/translate', methods=['POST'])
@@ -524,16 +523,15 @@ def update_total_word_counts(user_id, language_id):
     """
     Runs the proper SQL statements to update the total_word_counts table.
     """
-    g.db.execute("""DELETE FROM total_word_counts
-                    WHERE user_id=?
-                    AND language_id=?""", [user_id, language_id])
-    g.db.execute("""INSERT INTO total_word_counts
-                    SELECT user_id, language_id, word, SUM(word_count)
-                    FROM text_word_counts
-                    WHERE user_id=?
-                    AND language_id=?
-                    GROUP BY user_id, language_id, word""", [user_id, language_id])
-    g.db.commit()
+    #TODO: this seems inefficient
+    db.session.query(TotalWordCount).filter_by(user_id=user_id, language_id=language_id).delete()
+    sel = (db.session.query(TextWordCount.user_id,
+                              TextWordCount.language_id,
+                              TextWordCount.word,
+                              func.sum(TextWordCount.word_count))
+                        .filter_by(user_id=user_id, language_id=language_id)
+                        .group_by(TextWordCount.user_id, TextWordCount.language_id, TextWordCount.word))
+    db.session.execute(insert(TotalWordCount).from_select(['user_id', 'language_id', 'word', 'word_count'], sel))
 
 def build_known_words_set(user_id, language_id):
     """
