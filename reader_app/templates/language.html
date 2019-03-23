@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Collections</h1>
+  <ul>
+  {% for collection in collections %}
+    <li><a href="{{ url_for('collection.show_collection', collection_id=collection.id) }}">{{ collection.name }}</a></li>
+  {% endfor %}
+  </ul>
+  <h1>Create New Collection</h1>
+  <form action="{{ url_for('language.add_collection', language_id=language_id) }}" method=post>
+      <p>Collection Name</p>
+      <input type=text name=name><br>
+      <input type="submit">
+  </form>
+  <h1>Delete Language</h1>
+  <form action="{{ url_for('language.delete_language', language_id=language_id) }}" method="post">
+    <input type="submit">
+  </form>
+{% endblock %}

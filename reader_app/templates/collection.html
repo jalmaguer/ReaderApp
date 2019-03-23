@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Texts</h1>
+    <ul>
+    {% for text in texts %}
+        <li><a href="{{ url_for('text.show_text', text_id=text.id) }}">{{ text.title }}</a></li>
+    {% endfor %}
+    </ul>
+    <h1>Paste in a Text</h1>
+    <form action="{{ url_for('collection.upload_text', collection_id=collection_id) }}" method="post">
+        <p>Text Name</p>
+        <input type=text name=title><br>
+        <p>Text</p>
+        <textarea name=body rows=15 cols=100></textarea><br>
+        <input type="submit">
+    </form>
+    <h1>Delete Collection</h1>
+    <form action="{{ url_for('collection.delete_collection', collection_id=collection_id) }}" method="post">
+        <input type="submit">
+    </form>
+{% endblock %}

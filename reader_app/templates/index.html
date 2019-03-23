@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>{% block title %}Languages{% endblock %}</h1>
+  <ul>
+  {% for language in languages %}
+    <li><a href="{{ url_for('language.show_language', language_id=language.id) }}">{{ language.name }}</a></li>
+  {% endfor %}
+  </ul>
+  {% if g.user %}
+    <h1>Add New Language</h1>
+    <form action="{{ url_for('language.add_language') }}" method="post">
+        <p>Language</p>
+        <input type=text name=language><br>
+        <input type="submit">
+    </form>
+  {% endif %}
+{% endblock %}

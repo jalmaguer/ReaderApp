@@ -1,0 +1,2 @@
+export FLASK_APP=reader_app
+export FLASK_ENV=development

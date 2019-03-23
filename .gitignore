@@ -5,3 +5,7 @@ __pycache__/
 config.py
 test_html/
 .idea/
+.coverage
+htmlcov/
+instance/
+.vscode/

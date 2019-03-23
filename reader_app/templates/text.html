@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{{ text.title }}</h1>
+    <p>{{ text.body }}</p>
+    <h1>Delete Text</h1>
+    <form action="{{ url_for('text.delete_text', text_id=text.id) }}" method="post">
+        <input type="submit">
+    </form>
+{% endblock %}
