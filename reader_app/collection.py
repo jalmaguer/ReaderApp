@@ -1,3 +1,6 @@
+from collections import defaultdict
+import re
+
 from flask import Blueprint, g, redirect, render_template, request, url_for
 from werkzeug.exceptions import abort
 
@@ -48,8 +51,17 @@ def upload_text(collection_id):
     language_id = db.execute('SELECT language_id'
                              ' FROM collection'
                              ' WHERE id=?', (collection_id,)).fetchone()[0]
-    db.execute('INSERT INTO text (user_id, language_id, collection_id, title, body)'
-               ' VALUES (?, ?, ?, ?, ?)',
+    cur = db.execute('INSERT INTO text (user_id, language_id, collection_id, title, body)'
+                     ' VALUES (?, ?, ?, ?, ?)',
                (g.user['id'], language_id, collection_id, title, body))
+    text_id = cur.lastrowid
+    tokens = re.split('(\w*)', body)
+    words = [token.lower() for token in tokens if token.isalpha()]
+    word_counts = defaultdict(int)
+    for word in words:
+        word_counts[word] += 1
+    word_count_tuples = [(g.user['id'], language_id, text_id, word, word_count) for word, word_count in word_counts.items()]
+    db.executemany('INSERT INTO text_word_count (user_id, language_id, text_id, word, word_count)'
+                   ' VALUES (?, ?, ?, ?, ?)', word_count_tuples)
     db.commit()
     return redirect(url_for('collection.show_collection', collection_id=collection_id))

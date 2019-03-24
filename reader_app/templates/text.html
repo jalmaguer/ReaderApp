@@ -1,10 +1,21 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>{{ text.title }}</h1>
-    <p>{{ text.body }}</p>
+    <h1>Statistics</h1>
+    <h1>Top Unknown Words</h1>
+    <h1>{{ title }}</h1>
+    <p>
+    {% for token_tuples in token_tuple_lines %}
+        {% for word, word_class in token_tuples -%}
+            <span class="{{ word_class }}">{{ word }}</span>
+        {%- endfor %}
+        <br>
+    {% endfor %}
+    </p>
     <h1>Delete Text</h1>
-    <form action="{{ url_for('text.delete_text', text_id=text.id) }}" method="post">
+    <form action="{{ url_for('text.delete_text', text_id=text_id) }}" method="post">
         <input type="submit">
     </form>
+
+    <script src="{{ url_for('static', filename='text_controller.js') }}"></script>
 {% endblock %}

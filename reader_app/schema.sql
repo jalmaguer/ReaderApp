@@ -41,3 +41,41 @@ CREATE TABLE language (
     name TEXT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES user (id)
 );
+
+CREATE TABLE text_word_count (
+    user_id INTEGER NOT NULL,
+    language_id INTEGER NOT NULL,
+    text_id INTEGER NOT NULL,
+    word TEXT NOT NULL,
+    word_count INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES user (id),
+    FOREIGN KEY (language_id) REFERENCES language (id),
+    FOREIGN KEY (text_id) REFERENCES text (id)
+);
+
+CREATE TABLE total_word_count (
+    user_id INTEGER NOT NULL,
+    language_id INTEGER NOT NULL,
+    word TEXT NOT NULL,
+    word_count INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES user (id),
+    FOREIGN KEY (language_id) REFERENCES language (id)
+);
+
+CREATE TABLE known_word (
+    user_id INTEGER NOT NULL,
+    language_id INTEGER NOT NULL,
+    word TEXT NOT NULL,
+    PRIMARY KEY (user_id, language_id, word),
+    FOREIGN KEY (user_id) REFERENCES user (id),
+    FOREIGN KEY (language_id) REFERENCES language (id)
+);
+
+CREATE TABLE learning_word (
+    user_id INTEGER NOT NULL,
+    language_id INTEGER NOT NULL,
+    word TEXT NOT NULL,
+    PRIMARY KEY (user_id, language_id, word),
+    FOREIGN KEY (user_id) REFERENCES user (id),
+    FOREIGN KEY (language_id) REFERENCES language (id)
+);
