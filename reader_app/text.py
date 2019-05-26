@@ -1,6 +1,6 @@
 import re
 
-from flask import Blueprint, redirect, render_template, url_for, g
+from flask import Blueprint, redirect, render_template, request, url_for, g
 from werkzeug.exceptions import abort
 
 from reader_app.auth import login_required
@@ -30,6 +30,7 @@ def show_text(text_id):
     return render_template('text.html',
                            text_id=text['id'],
                            title=text['title'],
+                           language_id=text['language_id'],
                            token_tuple_lines=token_tuple_lines)
 
 
@@ -43,6 +44,31 @@ def delete_text(text_id):
     db.execute('DELETE FROM text_word_count WHERE text_id = ?', (text_id,))
     db.commit()
     return redirect(url_for('collection.show_collection', collection_id=text['collection_id']))
+
+
+@bp.route('/update_word', methods=('POST',))
+@login_required
+def update_word():
+    postObject = request.json
+    print(postObject)
+    word = postObject['word'].lower()
+    db = get_db()
+
+    removeFrom = postObject['removeFrom']
+    addTo = postObject['addTo']
+    language_id = postObject['languageID']
+
+    if removeFrom == 'known':
+        db.execute('DELETE FROM known_word'
+                   ' WHERE user_id=?'
+                   ' AND language_id=?'
+                   ' AND word=?', (g.user['id'], language_id, word))
+
+    if addTo == 'known':
+        db.execute('INSERT INTO known_word (user_id, language_id, word) VALUES (?, ?, ?)', (g.user['id'], language_id, word))
+
+    db.commit()
+    return 'post successful'
 
 
 def tokenize_text(text_body, known_words):

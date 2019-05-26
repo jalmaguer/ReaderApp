@@ -17,5 +17,8 @@
         <input type="submit">
     </form>
 
+    <p id="languageIDHiddenContent" style="display: none">{{ language_id }}</p>
+    <p id="collectionIDHiddenContent" style="display: none">{{ collection_id }}</p>
+
     <script src="{{ url_for('static', filename='text_controller.js') }}"></script>
 {% endblock %}

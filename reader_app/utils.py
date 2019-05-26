@@ -7,4 +7,5 @@ def build_known_words_set(user_id, language_id):
                              ' FROM known_word'
                              ' WHERE user_id=?'
                              ' AND language_id=?', (user_id, language_id)).fetchall()
-    return known_words
+    known_words_set = set(row[0] for row in known_words)
+    return known_words_set
