@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Known Words</h1>
+    <ol>
+    {% for word in known_words %}
+        <li>{{ word.word }}</li>
+    {% endfor %}
+    </ol>
+{% endblock %}

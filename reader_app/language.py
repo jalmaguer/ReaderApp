@@ -77,3 +77,16 @@ def add_collection(language_id):
         return redirect(url_for('language.show_language', language_id=language_id))
 
     return redirect(url_for('language.show_language', language_id=language_id))
+
+
+@bp.route('/<int:language_id>/known_words')
+@login_required
+def show_known_words(language_id):
+    db = get_db()
+    known_words = db.execute('SELECT word'
+                             ' FROM known_word'
+                             ' WHERE user_id=?'
+                             ' AND language_id=?',
+                             (g.user['id'], language_id)).fetchall()
+    print(known_words)
+    return render_template('known_words.html', known_words=known_words)

@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 
 {% block content %}
+  <h1>Stats</h1>
+  <h1>Known Words</h1>
+    <a href="{{ url_for('language.show_known_words', language_id=language_id) }}">known words</a>
   <h1>Collections</h1>
   <ul>
   {% for collection in collections %}
