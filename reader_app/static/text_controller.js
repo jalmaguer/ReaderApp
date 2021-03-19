@@ -1,7 +1,7 @@
 let spans = document.body.getElementsByTagName("span");
 let languageID = parseInt(document.getElementById("languageIDHiddenContent").textContent);
 for (let span of spans) {
-    if (span.className == "unknown") {
+    if (span.className == "unknown" || span.className == "known") {
         span.addEventListener("click", event => {
             let oldClass = event.target.className;
             let word = event.target.textContent;
