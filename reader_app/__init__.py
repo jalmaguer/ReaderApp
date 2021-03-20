@@ -2,6 +2,7 @@ import os
 
 from flask import Flask, render_template
 
+from reader_app.auth import login_required
 from reader_app.db import get_db
 
 
@@ -27,6 +28,7 @@ def create_app(test_config=None):
     #     return 'Hello, World!'
 
     @app.route('/')
+    @login_required
     def index():
         db = get_db()
         languages = db.execute('SELECT id, name FROM language').fetchall()
