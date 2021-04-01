@@ -5,7 +5,7 @@ from werkzeug.exceptions import abort
 
 from reader_app.auth import login_required
 from reader_app.db import get_db
-from reader_app.utils import build_known_words_set
+from reader_app.utils import build_known_words_set, build_stats_dict, build_text_word_counts_dict
 
 
 bp = Blueprint('text', __name__, url_prefix='/text')
@@ -26,12 +26,15 @@ def get_text(text_id):
 def show_text(text_id):
     text = get_text(text_id)
     known_words = build_known_words_set(g.user['id'], text['language_id'])
+    word_counts = build_text_word_counts_dict(text_id)
     token_tuple_lines = tokenize_text(text['body'], known_words)
+    stats_dict = build_stats_dict(word_counts, known_words)
     return render_template('text.html',
                            text_id=text['id'],
                            title=text['title'],
                            language_id=text['language_id'],
-                           token_tuple_lines=token_tuple_lines)
+                           token_tuple_lines=token_tuple_lines,
+                           stats_dict=stats_dict)
 
 
 @bp.route('/<int:text_id>/delete', methods=('POST',))

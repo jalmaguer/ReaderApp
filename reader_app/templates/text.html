@@ -2,6 +2,12 @@
 
 {% block content %}
     <h1>Statistics</h1>
+    <ul>
+        <li>total words: {{ stats_dict.word_count }}</li>
+        <li>known words: {{ stats_dict.known_word_count }}</li>
+        <li>unknown words: {{ stats_dict.unknown_word_count }}</li>
+        <li>percent known: {{ stats_dict.percent_known }}</li>
+    </ul>
     <h1>Top Unknown Words</h1>
     <h1>{{ title }}</h1>
     <p>
