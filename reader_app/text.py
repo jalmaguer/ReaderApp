@@ -27,6 +27,8 @@ def show_text(text_id):
     text = get_text(text_id)
     known_words = build_known_words_set(g.user['id'], text['language_id'])
     word_counts = build_text_word_counts_dict(text_id)
+    top_unknown_words = [(count, word) for word, count in word_counts.items() if count > 1 and word not in known_words]
+    top_unknown_words.sort(reverse=True)
     token_tuple_lines = tokenize_text(text['body'], known_words)
     stats_dict = build_stats_dict(word_counts, known_words)
     return render_template('text.html',
@@ -34,6 +36,7 @@ def show_text(text_id):
                            title=text['title'],
                            language_id=text['language_id'],
                            token_tuple_lines=token_tuple_lines,
+                           top_unknown_words=top_unknown_words,
                            stats_dict=stats_dict)
 
 

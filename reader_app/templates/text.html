@@ -9,6 +9,11 @@
         <li>percent known: {{ stats_dict.percent_known }}</li>
     </ul>
     <h1>Top Unknown Words</h1>
+    <ol>
+    {% for count, word in top_unknown_words %}
+        <li><span class="unknown">{{ word }}</span>: {{ count }}</li>
+    {% endfor %}
+    </ol>
     <h1>{{ title }}</h1>
     <p>
     {% for token_tuples in token_tuple_lines %}
