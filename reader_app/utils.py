@@ -16,8 +16,6 @@ def build_text_word_counts_dict(text_id):
     query_result = db.execute('SELECT word, word_count'
                               ' FROM text_word_count'
                               ' WHERE text_id=?', (text_id,)).fetchall()
-    print(type(query_result))
-    print(query_result)
     word_counts = {row['word']: row['word_count'] for row in query_result}
     return word_counts
 
